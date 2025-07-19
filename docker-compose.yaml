@@ -1,0 +1,27 @@
+version: "3.4"
+
+services:
+  db:
+    image: postgres:15.6
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    env_file:
+      - ./backend/envs/dev.env
+    volumes:
+      - db_volume:/var/lib/postgresql/data
+    container_name: "mealplan-pro_db"
+    networks:
+      - web_proxy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "1"
+
+networks:
+  web_proxy:
+    driver: bridge
+
+volumes:
+  db_volume:
