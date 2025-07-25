@@ -55,9 +55,7 @@ export default function MealForm() {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/meals`, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({
-                    form,
-                }),
+                body: JSON.stringify(form),
             });
 
             if (!res.ok) throw new Error("Errore nel salvataggio");
