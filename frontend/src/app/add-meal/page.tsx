@@ -22,8 +22,12 @@ export default function AddMealPage() {
     }, [setHeader]);
 
     return (
-    <main className="max-w-7xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Aggiungi Nuovo Piatto</h1>
+    <main className="max-w-2xl mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-1">Crea Piatto Unico</h1>
+      <p className="text-gray-500 mb-6 text-sm">
+        Componi un piatto assemblando ingredienti o ricette nei 3 slot fondamentali:
+        carboidrati, proteine e verdure.
+      </p>
       <MealForm />
     </main>
   );

@@ -1,0 +1,264 @@
+{
+  "_comment": "File di fixture per i dati di default. Modifica liberamente questo file e riesegui il seed.",
+  "_note": "Le ricette e i piatti con user_id=null sono globali (visibili a tutti gli utenti).",
+
+  "ingredients": [
+    { "name": "Pasta", "category": "carbohydrate", "healthiness_score": 6, "unit": "g", "description": "Pasta di grano duro" },
+    { "name": "Riso", "category": "carbohydrate", "healthiness_score": 7, "unit": "g", "description": "Riso bianco" },
+    { "name": "Riso integrale", "category": "carbohydrate", "healthiness_score": 9, "unit": "g", "description": "Riso integrale" },
+    { "name": "Pane", "category": "carbohydrate", "healthiness_score": 5, "unit": "g", "description": "Pane di grano" },
+    { "name": "Pane integrale", "category": "carbohydrate", "healthiness_score": 8, "unit": "g", "description": "Pane integrale" },
+    { "name": "Patate", "category": "carbohydrate", "healthiness_score": 7, "unit": "g", "description": "Patate bollite" },
+    { "name": "Patate dolci", "category": "carbohydrate", "healthiness_score": 9, "unit": "g", "description": "Patate dolci al forno" },
+    { "name": "Quinoa", "category": "carbohydrate", "healthiness_score": 9, "unit": "g", "description": "Pseudocereale ricco di proteine" },
+    { "name": "Orzo", "category": "carbohydrate", "healthiness_score": 8, "unit": "g", "description": "Orzo perlato" },
+    { "name": "Cous cous", "category": "carbohydrate", "healthiness_score": 6, "unit": "g", "description": "Semola di grano duro" },
+    { "name": "Farro", "category": "carbohydrate", "healthiness_score": 9, "unit": "g", "description": "Cereale antico" },
+
+    { "name": "Petto di pollo", "category": "protein", "healthiness_score": 9, "unit": "g", "description": "Carne bianca magra" },
+    { "name": "Coscia di pollo", "category": "protein", "healthiness_score": 7, "unit": "g", "description": "Carne bianca con più grassi" },
+    { "name": "Manzo", "category": "protein", "healthiness_score": 6, "unit": "g", "description": "Carne rossa" },
+    { "name": "Maiale", "category": "protein", "healthiness_score": 5, "unit": "g", "description": "Carne di maiale" },
+    { "name": "Salmone", "category": "protein", "healthiness_score": 9, "unit": "g", "description": "Pesce ricco di omega-3" },
+    { "name": "Tonno", "category": "protein", "healthiness_score": 8, "unit": "g", "description": "Tonno in scatola" },
+    { "name": "Merluzzo", "category": "protein", "healthiness_score": 8, "unit": "g", "description": "Pesce bianco magro" },
+    { "name": "Uova", "category": "protein", "healthiness_score": 8, "unit": "pz", "description": "Uova di gallina" },
+    { "name": "Tofu", "category": "protein", "healthiness_score": 8, "unit": "g", "description": "Proteina vegetale" },
+    { "name": "Legumi misti", "category": "protein", "healthiness_score": 9, "unit": "g", "description": "Ceci, lenticchie, fagioli" },
+    { "name": "Lenticchie", "category": "protein", "healthiness_score": 9, "unit": "g", "description": "Legumi ricchi di ferro" },
+    { "name": "Ceci", "category": "protein", "healthiness_score": 9, "unit": "g", "description": "Legumi versatili" },
+    { "name": "Guanciale", "category": "protein", "healthiness_score": 3, "unit": "g", "description": "Salume grasso" },
+    { "name": "Prosciutto cotto", "category": "protein", "healthiness_score": 6, "unit": "g", "description": "Salume cotto magro" },
+    { "name": "Mozzarella", "category": "protein", "healthiness_score": 6, "unit": "g", "description": "Formaggio fresco" },
+
+    { "name": "Spinaci", "category": "vegetable", "healthiness_score": 9, "unit": "g", "description": "Ricchi di ferro e folati" },
+    { "name": "Pomodori", "category": "vegetable", "healthiness_score": 8, "unit": "g", "description": "Pomodori freschi" },
+    { "name": "Insalata", "category": "vegetable", "healthiness_score": 7, "unit": "g", "description": "Lattuga mista" },
+    { "name": "Carote", "category": "vegetable", "healthiness_score": 8, "unit": "g", "description": "Carote fresche" },
+    { "name": "Zucchine", "category": "vegetable", "healthiness_score": 8, "unit": "g", "description": "Zucchine grigliate" },
+    { "name": "Cipolla", "category": "vegetable", "healthiness_score": 7, "unit": "g" },
+    { "name": "Sedano", "category": "vegetable", "healthiness_score": 7, "unit": "g" },
+    { "name": "Piselli", "category": "vegetable", "healthiness_score": 8, "unit": "g" },
+    { "name": "Broccoli", "category": "vegetable", "healthiness_score": 10, "unit": "g", "description": "Verdura crucifere ricca di antiossidanti" },
+    { "name": "Peperoni", "category": "vegetable", "healthiness_score": 8, "unit": "g", "description": "Peperoni colorati" },
+    { "name": "Melanzane", "category": "vegetable", "healthiness_score": 7, "unit": "g" },
+    { "name": "Cavolo nero", "category": "vegetable", "healthiness_score": 10, "unit": "g", "description": "Superfood verde scuro" },
+    { "name": "Finocchi", "category": "vegetable", "healthiness_score": 8, "unit": "g" },
+    { "name": "Asparagi", "category": "vegetable", "healthiness_score": 9, "unit": "g" },
+    { "name": "Funghi", "category": "vegetable", "healthiness_score": 8, "unit": "g" },
+
+    { "name": "Parmigiano", "category": "other", "healthiness_score": null, "unit": "g", "description": "Formaggio stagionato" },
+    { "name": "Olio EVO", "category": "other", "healthiness_score": null, "unit": "ml", "description": "Olio extra vergine di oliva" },
+    { "name": "Aglio", "category": "other", "healthiness_score": null, "unit": "g" },
+    { "name": "Limone", "category": "other", "healthiness_score": null, "unit": "pz" },
+    { "name": "Pecorino", "category": "other", "healthiness_score": null, "unit": "g" }
+  ],
+
+  "recipes": [
+    {
+      "name": "Carbonara",
+      "description": "La classica pasta alla carbonara romana",
+      "instructions": "Cuocere la pasta. Rosolare il guanciale. Mescolare uova e parmigiano. Unire tutto fuori dal fuoco.",
+      "ingredients": [
+        { "ingredient": "Pasta", "quantity": 100, "unit": "g" },
+        { "ingredient": "Guanciale", "quantity": 50, "unit": "g" },
+        { "ingredient": "Uova", "quantity": 2, "unit": "pz" },
+        { "ingredient": "Pecorino", "quantity": 30, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Pasta al pomodoro",
+      "description": "Il grande classico della cucina italiana",
+      "instructions": "Cuocere la pasta. Preparare il sugo con pomodori freschi e olio EVO. Condire.",
+      "ingredients": [
+        { "ingredient": "Pasta", "quantity": 100, "unit": "g" },
+        { "ingredient": "Pomodori", "quantity": 150, "unit": "g" },
+        { "ingredient": "Olio EVO", "quantity": 10, "unit": "ml" },
+        { "ingredient": "Aglio", "quantity": 5, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Risotto ai funghi",
+      "description": "Risotto cremoso con funghi misti",
+      "instructions": "Tostare il riso. Aggiungere brodo caldo a mestoli. Unire i funghi saltati e mantecare.",
+      "ingredients": [
+        { "ingredient": "Riso", "quantity": 100, "unit": "g" },
+        { "ingredient": "Funghi", "quantity": 150, "unit": "g" },
+        { "ingredient": "Cipolla", "quantity": 30, "unit": "g" },
+        { "ingredient": "Parmigiano", "quantity": 20, "unit": "g" },
+        { "ingredient": "Olio EVO", "quantity": 10, "unit": "ml" }
+      ]
+    },
+    {
+      "name": "Minestrone",
+      "description": "Zuppa di verdure miste",
+      "instructions": "Soffriggere cipolla e sedano. Aggiungere le verdure a cubetti. Coprire con acqua e cuocere 30 minuti.",
+      "ingredients": [
+        { "ingredient": "Carote", "quantity": 80, "unit": "g" },
+        { "ingredient": "Zucchine", "quantity": 80, "unit": "g" },
+        { "ingredient": "Cipolla", "quantity": 40, "unit": "g" },
+        { "ingredient": "Sedano", "quantity": 40, "unit": "g" },
+        { "ingredient": "Piselli", "quantity": 60, "unit": "g" },
+        { "ingredient": "Pomodori", "quantity": 60, "unit": "g" },
+        { "ingredient": "Olio EVO", "quantity": 10, "unit": "ml" }
+      ]
+    },
+    {
+      "name": "Insalata di pollo",
+      "description": "Pollo grigliato con insalata mista",
+      "instructions": "Grigliare il petto di pollo e affettarlo. Condire l'insalata con olio e limone. Unire tutto.",
+      "ingredients": [
+        { "ingredient": "Petto di pollo", "quantity": 150, "unit": "g" },
+        { "ingredient": "Insalata", "quantity": 100, "unit": "g" },
+        { "ingredient": "Pomodori", "quantity": 80, "unit": "g" },
+        { "ingredient": "Carote", "quantity": 50, "unit": "g" },
+        { "ingredient": "Olio EVO", "quantity": 10, "unit": "ml" }
+      ]
+    },
+    {
+      "name": "Salmone agli spinaci",
+      "description": "Salmone al vapore con spinaci saltati",
+      "instructions": "Cuocere il salmone al vapore 15 minuti. Saltare gli spinaci in padella con aglio e olio.",
+      "ingredients": [
+        { "ingredient": "Salmone", "quantity": 150, "unit": "g" },
+        { "ingredient": "Spinaci", "quantity": 150, "unit": "g" },
+        { "ingredient": "Olio EVO", "quantity": 10, "unit": "ml" },
+        { "ingredient": "Aglio", "quantity": 3, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Pollo ai broccoli",
+      "description": "Petto di pollo saltato con broccoli",
+      "instructions": "Tagliare il pollo a bocconcini. Sbollentare i broccoli. Saltare tutto in padella con olio e aglio.",
+      "ingredients": [
+        { "ingredient": "Petto di pollo", "quantity": 150, "unit": "g" },
+        { "ingredient": "Broccoli", "quantity": 200, "unit": "g" },
+        { "ingredient": "Aglio", "quantity": 5, "unit": "g" },
+        { "ingredient": "Olio EVO", "quantity": 10, "unit": "ml" }
+      ]
+    },
+    {
+      "name": "Zuppa di lenticchie",
+      "description": "Zuppa calda di lenticchie con verdure",
+      "instructions": "Soffriggere cipolla e carote. Aggiungere le lenticchie e coprire con acqua. Cuocere 30 minuti.",
+      "ingredients": [
+        { "ingredient": "Lenticchie", "quantity": 100, "unit": "g" },
+        { "ingredient": "Carote", "quantity": 80, "unit": "g" },
+        { "ingredient": "Cipolla", "quantity": 50, "unit": "g" },
+        { "ingredient": "Sedano", "quantity": 40, "unit": "g" },
+        { "ingredient": "Olio EVO", "quantity": 10, "unit": "ml" }
+      ]
+    },
+    {
+      "name": "Tonno e fagioli",
+      "description": "Classico piatto freddo proteico",
+      "instructions": "Scolare il tonno. Mescolare con i ceci, cipolla tagliata fine e olio. Condire con limone.",
+      "ingredients": [
+        { "ingredient": "Tonno", "quantity": 120, "unit": "g" },
+        { "ingredient": "Ceci", "quantity": 100, "unit": "g" },
+        { "ingredient": "Cipolla", "quantity": 30, "unit": "g" },
+        { "ingredient": "Olio EVO", "quantity": 10, "unit": "ml" },
+        { "ingredient": "Limone", "quantity": 0.5, "unit": "pz" }
+      ]
+    },
+    {
+      "name": "Quinoa bowl",
+      "description": "Bowl di quinoa con verdure arrostite",
+      "instructions": "Cuocere la quinoa. Arrostire i peperoni e le zucchine. Comporre la bowl e condire.",
+      "ingredients": [
+        { "ingredient": "Quinoa", "quantity": 80, "unit": "g" },
+        { "ingredient": "Peperoni", "quantity": 100, "unit": "g" },
+        { "ingredient": "Zucchine", "quantity": 80, "unit": "g" },
+        { "ingredient": "Olio EVO", "quantity": 10, "unit": "ml" }
+      ]
+    }
+  ],
+
+  "dishes": [
+    {
+      "name": "Carbonara completa",
+      "description": "Carbonara con insalata mista — piatto unico bilanciato",
+      "components": [
+        { "slot_category": "carbohydrate", "recipe": "Carbonara", "quantity": 1, "unit": "porzione" },
+        { "slot_category": "vegetable", "ingredient": "Insalata", "quantity": 80, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Minestrone con carne e pane",
+      "description": "Minestrone di verdure, fettina di manzo e pane",
+      "components": [
+        { "slot_category": "carbohydrate", "ingredient": "Pane", "quantity": 50, "unit": "g" },
+        { "slot_category": "protein", "ingredient": "Manzo", "quantity": 100, "unit": "g" },
+        { "slot_category": "vegetable", "recipe": "Minestrone", "quantity": 1, "unit": "porzione" }
+      ]
+    },
+    {
+      "name": "Bowl salmone e riso",
+      "description": "Riso, salmone agli spinaci — piatto nutriente e bilanciato",
+      "components": [
+        { "slot_category": "carbohydrate", "ingredient": "Riso", "quantity": 80, "unit": "g" },
+        { "slot_category": "protein", "recipe": "Salmone agli spinaci", "quantity": 1, "unit": "porzione" },
+        { "slot_category": "vegetable", "ingredient": "Zucchine", "quantity": 80, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Insalata di pollo con pane",
+      "description": "Insalata di pollo grigliato con pane integrale",
+      "components": [
+        { "slot_category": "carbohydrate", "ingredient": "Pane integrale", "quantity": 50, "unit": "g" },
+        { "slot_category": "protein", "recipe": "Insalata di pollo", "quantity": 1, "unit": "porzione" }
+      ]
+    },
+    {
+      "name": "Pasta al pomodoro e spinaci",
+      "description": "Pasta al pomodoro con spinaci saltati",
+      "components": [
+        { "slot_category": "carbohydrate", "recipe": "Pasta al pomodoro", "quantity": 1, "unit": "porzione" },
+        { "slot_category": "vegetable", "ingredient": "Spinaci", "quantity": 100, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Pollo ai broccoli con riso",
+      "description": "Piatto unico completo ad alto indice di salubrità",
+      "components": [
+        { "slot_category": "carbohydrate", "ingredient": "Riso integrale", "quantity": 80, "unit": "g" },
+        { "slot_category": "protein", "recipe": "Pollo ai broccoli", "quantity": 1, "unit": "porzione" },
+        { "slot_category": "vegetable", "ingredient": "Carote", "quantity": 80, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Zuppa di lenticchie e pane",
+      "description": "Zuppa proteica con pane integrale",
+      "components": [
+        { "slot_category": "carbohydrate", "ingredient": "Pane integrale", "quantity": 60, "unit": "g" },
+        { "slot_category": "protein", "recipe": "Zuppa di lenticchie", "quantity": 1, "unit": "porzione" }
+      ]
+    },
+    {
+      "name": "Risotto ai funghi con insalata",
+      "description": "Risotto cremoso completato da verdure fresche",
+      "components": [
+        { "slot_category": "carbohydrate", "recipe": "Risotto ai funghi", "quantity": 1, "unit": "porzione" },
+        { "slot_category": "vegetable", "ingredient": "Insalata", "quantity": 80, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Tonno, ceci e pane",
+      "description": "Piatto freddo proteico con pane",
+      "components": [
+        { "slot_category": "carbohydrate", "ingredient": "Pane", "quantity": 60, "unit": "g" },
+        { "slot_category": "protein", "recipe": "Tonno e fagioli", "quantity": 1, "unit": "porzione" },
+        { "slot_category": "vegetable", "ingredient": "Pomodori", "quantity": 100, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Quinoa bowl completa",
+      "description": "Bowl vegetariana bilanciata con tofu",
+      "components": [
+        { "slot_category": "carbohydrate", "recipe": "Quinoa bowl", "quantity": 1, "unit": "porzione" },
+        { "slot_category": "protein", "ingredient": "Tofu", "quantity": 120, "unit": "g" },
+        { "slot_category": "vegetable", "ingredient": "Spinaci", "quantity": 80, "unit": "g" }
+      ]
+    }
+  ]
+}

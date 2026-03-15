@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import JSON
 from app.core.database import Base
 
 class Meal(Base):
@@ -10,6 +11,5 @@ class Meal(Base):
     carbohydrate = Column(String, nullable=False)
     protein = Column(String, nullable=False)
     vegetable = Column(String, nullable=False)
-    ingredients = Column(ARRAY(String), nullable=False)
-    description = Column(Text)
+    ingredients = Column(JSON, nullable=False)
     instructions = Column(Text)
