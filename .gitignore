@@ -224,3 +224,9 @@ Thumbs.db
 
 **/data/
 !**/data/.gitkeep
+
+# Local agent configuration directories
+/.agents/
+/.github/
+
+**/*.env
