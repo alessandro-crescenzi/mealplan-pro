@@ -13,6 +13,98 @@ services:
     container_name: "mealplan-pro_db"
     networks:
       - web_proxy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d mealplan"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "1"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    env_file:
+      - ./backend/envs/dev.env
+    environment:
+      - DB_HOST=db
+    volumes:
+      - ./backend:/app
+    container_name: "mealplan-pro_backend"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - web_proxy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "1"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+      - BACKEND_URL=http://backend:8000
+      - NEXTAUTH_URL=http://localhost:3000
+    env_file:
+      - ./frontend/.env.local
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    container_name: "mealplan-pro_frontend"
+    depends_on:
+      - backend
+    networks:
+      - web_proxy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "1"
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama_volume:/root/.ollama
+    container_name: "mealplan-pro_ollama"
+    networks:
+      - web_proxy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "1"
+
+  proxy:
+    build:
+      context: ./proxy
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    container_name: "mealplan-pro_proxy"
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - web_proxy
     logging:
       driver: "json-file"
       options:
@@ -25,3 +117,4 @@ networks:
 
 volumes:
   db_volume:
+  ollama_volume:
