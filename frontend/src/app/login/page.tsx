@@ -10,7 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [providers, setProviders] = useState<any>(null);
+  const [providers, setProviders] = useState<Awaited<ReturnType<typeof getProviders>>>(null);
 
   useEffect(() => {
     getProviders().then(setProviders);

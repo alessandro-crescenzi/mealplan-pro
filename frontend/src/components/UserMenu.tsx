@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { User, LogOut, Settings, ChevronDown } from "lucide-react";
 import Link from "next/link";
 
-export function UserMenu() {
+export default function UserMenu() {
   const { data: session, status } = useSession();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
