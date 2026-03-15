@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { HeaderProvider, HeaderActions } from "@/components/HeaderContext";
+import { HeaderProvider } from "@/components/HeaderContext";
+import AppHeaderControls from "@/components/AppHeaderControls";
 import { Providers } from "@/components/Providers";
-import { UserMenu } from "@/components/UserMenu";
 import { ChefHat } from "lucide-react";
 import Link from "next/link";
 import "./globals.css";
@@ -38,10 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <ChefHat className="text-green-600" />
                   MealPlan Pro
                 </Link>
-                <div className="flex items-center gap-4">
-                  <HeaderActions />
-                  <UserMenu />
-                </div>
+                <AppHeaderControls />
               </div>
             </header>
             <main className="max-w-7xl mx-auto px-4 py-8">{children}</main>
