@@ -1,10 +1,10 @@
-import type { AuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
+import NextAuth from "next-auth";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
-export const authOptions: AuthOptions = {
+export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -85,10 +85,10 @@ export const authOptions: AuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      session.user.id = token.id as string;
-      session.accessToken = token.accessToken;
+      session.user.id = typeof token.id === "string" ? token.id : "";
+      session.accessToken = typeof token.accessToken === "string" ? token.accessToken : undefined;
       return session;
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
-};
+});
