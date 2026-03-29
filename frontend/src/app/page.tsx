@@ -1,15 +1,7 @@
 // app/page.tsx (Homepage = pagina di login)
-import { auth } from "@/lib/auth";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
-export default async function Page() {
-  const session = await auth();
-
-  if (session) {
-    redirect("/home");
-  }
-
+export default function Page() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
       <div className="bg-white shadow-md p-8 rounded-md w-full max-w-md text-center space-y-4">
