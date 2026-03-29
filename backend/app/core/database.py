@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 import os
 from dotenv import load_dotenv
 
-if os.getenv("ENV") == "DEV":
+if os.getenv("ENV") == "LOCAL":
     load_dotenv(dotenv_path="./envs/dev.env")
 
     DB_USER = os.getenv("POSTGRES_USER")
