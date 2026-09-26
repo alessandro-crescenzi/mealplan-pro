@@ -1,0 +1,235 @@
+.app {
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 24px 16px 64px;
+}
+
+.app__header {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin-bottom: 24px;
+}
+
+.app__header-row {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+
+.app__actions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.app__header h1 {
+	font-size: 28px;
+	letter-spacing: -0.5px;
+}
+
+.app__week-range {
+	margin: 0;
+	color: var(--text);
+	font-size: 15px;
+}
+
+.app__status {
+	color: var(--text);
+	font-size: 15px;
+}
+
+.app__status--error {
+	color: #c0392b;
+}
+
+.week-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 16px;
+}
+
+.day-card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	box-shadow: var(--shadow);
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+.day-card--weekend {
+	border-color: color-mix(in srgb, var(--accent-weekend) 40%, var(--border));
+}
+
+.day-card__header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+	border-bottom: 1px solid var(--border);
+	padding-bottom: 10px;
+}
+
+.day-card__header h3 {
+	font-size: 16px;
+}
+
+.day-card__date {
+	font-size: 13px;
+	color: var(--text);
+	opacity: 0.7;
+}
+
+.day-card__meal {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.day-card__label {
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--accent);
+}
+
+.day-card__dish {
+	margin: 0;
+	font-size: 15px;
+	color: var(--text-h);
+}
+
+.day-card__select {
+	font: inherit;
+	font-size: 15px;
+	color: var(--text-h);
+	padding: 6px 8px;
+	border-radius: 8px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	width: 100%;
+}
+
+.btn {
+	font: inherit;
+	font-size: 14px;
+	font-weight: 600;
+	padding: 10px 16px;
+	border-radius: 10px;
+	border: 1px solid transparent;
+	cursor: pointer;
+}
+
+.btn--primary {
+	background: var(--accent);
+	color: white;
+}
+
+.btn--primary:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.btn--ghost {
+	background: var(--surface);
+	border-color: var(--border);
+	color: var(--text-h);
+}
+
+.btn--ghost:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.modal-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(23, 23, 31, 0.45);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 16px;
+	z-index: 100;
+}
+
+.modal {
+	background: var(--surface);
+	border-radius: 16px;
+	box-shadow: var(--shadow);
+	width: 100%;
+	max-width: 420px;
+	padding: 20px;
+}
+
+.modal__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 16px;
+}
+
+.modal__close {
+	background: none;
+	border: none;
+	font-size: 22px;
+	line-height: 1;
+	cursor: pointer;
+	color: var(--text);
+}
+
+.modal__actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.confirm-modal__message {
+	margin: 0 0 4px;
+	font-size: 15px;
+}
+
+.dish-form {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+.dish-form__field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-h);
+}
+
+.dish-form__field input,
+.dish-form__field select {
+	font: inherit;
+	font-size: 15px;
+	font-weight: 400;
+	padding: 8px 10px;
+	border-radius: 8px;
+	border: 1px solid var(--border);
+	background: var(--bg);
+}
+
+.dish-form__checkbox {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+}
+
+@media (max-width: 640px) {
+	.week-grid {
+		grid-template-columns: 1fr;
+	}
+}
