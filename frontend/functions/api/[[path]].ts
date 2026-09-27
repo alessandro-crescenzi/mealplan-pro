@@ -276,7 +276,7 @@ async function handleGetPlan(request: Request, env: Env): Promise<Response> {
 	const requesterEmail = getAuthenticatedEmail(request);
 	if (!requesterEmail) return unauthorized();
 	const url = new URL(request.url);
-	const ownerEmail = url.searchParams.get("ownerEmail") || requesterEmail;
+	const ownerEmail = (url.searchParams.get("ownerEmail") || requesterEmail).toLowerCase();
 	if (!(await resolveAccess(env, requesterEmail, ownerEmail, "view"))) {
 		return json({ error: "Non hai accesso a questo piano." }, { status: 403 });
 	}
@@ -290,7 +290,7 @@ async function handleGeneratePlan(request: Request, env: Env): Promise<Response>
 	const requesterEmail = getAuthenticatedEmail(request);
 	if (!requesterEmail) return unauthorized();
 	const body = (await request.json().catch(() => ({}))) as { ownerEmail?: string; weekStart?: string };
-	const ownerEmail = body.ownerEmail || requesterEmail;
+	const ownerEmail = (body.ownerEmail || requesterEmail).toLowerCase();
 	if (!(await resolveAccess(env, requesterEmail, ownerEmail, "edit"))) {
 		return json({ error: "Non hai i permessi per modificare questo piano." }, { status: 403 });
 	}
@@ -317,7 +317,7 @@ async function handleSwapDish(request: Request, env: Env): Promise<Response> {
 	if (body.slot !== "pranzo" && body.slot !== "cena") {
 		return json({ error: "'slot' deve essere 'pranzo' o 'cena'." }, { status: 400 });
 	}
-	const ownerEmail = body.ownerEmail || requesterEmail;
+	const ownerEmail = (body.ownerEmail || requesterEmail).toLowerCase();
 	if (!(await resolveAccess(env, requesterEmail, ownerEmail, "edit"))) {
 		return json({ error: "Non hai i permessi per modificare questo piano." }, { status: 403 });
 	}
