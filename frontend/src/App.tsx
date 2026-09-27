@@ -5,19 +5,23 @@ import { AddDishModal } from "./components/AddDishModal";
 import { ConfirmModal } from "./components/ConfirmModal";
 import { RecipeList } from "./components/RecipeList";
 import { OwnerSwitcher } from "./components/OwnerSwitcher";
+import { ShareModal } from "./components/ShareModal";
 import {
 	addDish,
+	addShare,
 	deleteDish,
 	generatePlan,
 	getDishes,
 	getMe,
 	getPlan,
+	getShares,
 	getSharedWithMe,
+	removeShare,
 	swapDish,
 	updateDish,
 } from "./lib/api";
 import { addDays, mondayOf } from "./lib/week";
-import type { Dish, DishType, IncomingShare, MealSlot, Plan } from "./lib/types";
+import type { Dish, DishType, IncomingShare, MealSlot, Permission, Plan, ShareEntry } from "./lib/types";
 
 function weekRangeLabel(weekStart: string): string {
 	const start = new Date(`${weekStart}T00:00:00`);
@@ -38,9 +42,11 @@ function App() {
 
 	const [isAddModalOpen, setAddModalOpen] = useState(false);
 	const [isRegenerateModalOpen, setRegenerateModalOpen] = useState(false);
+	const [isShareModalOpen, setShareModalOpen] = useState(false);
 	const [regenerating, setRegenerating] = useState(false);
 	const [regenerateError, setRegenerateError] = useState<string | null>(null);
 	const [swapError, setSwapError] = useState<string | null>(null);
+	const [shares, setShares] = useState<ShareEntry[]>([]);
 
 	const currentWeekStart = useMemo(() => mondayOf(new Date()), []);
 	const nextWeekStart = useMemo(() => addDays(currentWeekStart, 7), [currentWeekStart]);
@@ -68,6 +74,9 @@ function App() {
 			getSharedWithMe()
 				.then(setSharedWithMe)
 				.catch(() => setSharedWithMe([]));
+			getShares()
+				.then(setShares)
+				.catch(() => setShares([]));
 			return;
 		}
 		setPlanLoading(true);
@@ -117,6 +126,16 @@ function App() {
 		} catch (err) {
 			setSwapError(err instanceof Error ? err.message : "Errore imprevisto.");
 		}
+	}
+
+	async function handleAddShare(granteeEmail: string, permission: Permission): Promise<void> {
+		const updated = await addShare({ granteeEmail, permission });
+		setShares(updated);
+	}
+
+	async function handleRemoveShare(granteeEmail: string): Promise<void> {
+		await removeShare(granteeEmail);
+		setShares((prev) => prev.filter((s) => s.granteeEmail !== granteeEmail));
 	}
 
 	async function handleUpdateDish(id: string, input: { name: string; type: DishType }): Promise<Dish> {
@@ -183,6 +202,11 @@ function App() {
 								<button type="button" className="btn btn--ghost" onClick={() => setAddModalOpen(true)}>
 									Aggiungi piatto
 								</button>
+								{isOwnPlan && (
+									<button type="button" className="btn btn--ghost" onClick={() => setShareModalOpen(true)}>
+										Condividi piano
+									</button>
+								)}
 								{canEditViewedPlan && (
 									<button
 										type="button"
@@ -241,6 +265,15 @@ function App() {
 					error={regenerateError}
 					onConfirm={handleConfirmRegenerate}
 					onCancel={() => setRegenerateModalOpen(false)}
+				/>
+			)}
+
+			{isShareModalOpen && (
+				<ShareModal
+					shares={shares}
+					onClose={() => setShareModalOpen(false)}
+					onAdd={handleAddShare}
+					onRemove={handleRemoveShare}
 				/>
 			)}
 		</div>
