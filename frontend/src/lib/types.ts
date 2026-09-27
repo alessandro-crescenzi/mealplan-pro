@@ -20,3 +20,15 @@ export interface Plan {
 	weekStart: string;
 	days: PlanDay[];
 }
+
+export type Permission = "view" | "edit";
+
+export interface ShareEntry {
+	granteeEmail: string;
+	permission: Permission;
+}
+
+export interface IncomingShare {
+	ownerEmail: string;
+	permission: Permission;
+}

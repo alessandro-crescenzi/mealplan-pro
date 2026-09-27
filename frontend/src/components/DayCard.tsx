@@ -6,6 +6,7 @@ interface DayCardProps {
 	dishes: Dish[];
 	dishesById: Record<string, Dish>;
 	onSwap: (date: string, slot: MealSlot, dishId: string) => void;
+	readOnly?: boolean;
 }
 
 function formatDate(dateStr: string): string {
@@ -20,6 +21,7 @@ function MealSlotRow({
 	dishes,
 	dishesById,
 	onSwap,
+	readOnly,
 }: {
 	label: string;
 	slot: MealSlot;
@@ -27,9 +29,20 @@ function MealSlotRow({
 	dishes: Dish[];
 	dishesById: Record<string, Dish>;
 	onSwap: (date: string, slot: MealSlot, dishId: string) => void;
+	readOnly?: boolean;
 }) {
 	const currentId = day[slot];
 	const current = currentId ? dishesById[currentId] : null;
+
+	if (readOnly) {
+		return (
+			<div className="day-card__meal">
+				<span className="day-card__label">{label}</span>
+				<p className="day-card__dish">{current?.name ?? "—"}</p>
+			</div>
+		);
+	}
+
 	const options = dishesForSlot(dishes, slot, day.isWeekend);
 	const optionsWithCurrent =
 		current && !options.some((d) => d.id === current.id) ? [...options, current] : options;
@@ -57,7 +70,7 @@ function MealSlotRow({
 	);
 }
 
-export function DayCard({ day, dishes, dishesById, onSwap }: DayCardProps) {
+export function DayCard({ day, dishes, dishesById, onSwap, readOnly }: DayCardProps) {
 	return (
 		<article className={`day-card${day.isWeekend ? " day-card--weekend" : ""}`}>
 			<header className="day-card__header">
@@ -72,6 +85,7 @@ export function DayCard({ day, dishes, dishesById, onSwap }: DayCardProps) {
 				dishes={dishes}
 				dishesById={dishesById}
 				onSwap={onSwap}
+				readOnly={readOnly}
 			/>
 			<MealSlotRow
 				label="Cena"
@@ -80,6 +94,7 @@ export function DayCard({ day, dishes, dishesById, onSwap }: DayCardProps) {
 				dishes={dishes}
 				dishesById={dishesById}
 				onSwap={onSwap}
+				readOnly={readOnly}
 			/>
 		</article>
 	);
