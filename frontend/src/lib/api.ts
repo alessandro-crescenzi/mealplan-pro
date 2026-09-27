@@ -40,3 +40,20 @@ export function swapDish(input: { date: string; slot: MealSlot; dishId: string }
 		body: JSON.stringify(input),
 	});
 }
+
+export function updateDish(id: string, input: { name: string; type: DishType }): Promise<Dish> {
+	return request<Dish>(`/api/dishes/${encodeURIComponent(id)}`, {
+		method: "PUT",
+		body: JSON.stringify(input),
+	});
+}
+
+export function deleteDish(id: string): Promise<void> {
+	return request<void>(`/api/dishes/${encodeURIComponent(id)}`, {
+		method: "DELETE",
+	});
+}
+
+export function getMe(): Promise<{ email: string | null; canDelete: boolean }> {
+	return request<{ email: string | null; canDelete: boolean }>("/api/me");
+}

@@ -3,7 +3,8 @@ import "./App.css";
 import { WeekView } from "./components/WeekView";
 import { AddDishModal } from "./components/AddDishModal";
 import { ConfirmModal } from "./components/ConfirmModal";
-import { addDish, generatePlan, getDishes, getPlan, swapDish } from "./lib/api";
+import { RecipeList } from "./components/RecipeList";
+import { addDish, deleteDish, generatePlan, getDishes, getMe, getPlan, swapDish, updateDish } from "./lib/api";
 import type { Dish, DishType, MealSlot, Plan } from "./lib/types";
 
 function weekRangeLabel(plan: Plan): string {
@@ -19,6 +20,8 @@ function App() {
 	const [plan, setPlan] = useState<Plan | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [view, setView] = useState<"plan" | "recipes">("plan");
+	const [canDelete, setCanDelete] = useState(false);
 
 	const [isAddModalOpen, setAddModalOpen] = useState(false);
 	const [isRegenerateModalOpen, setRegenerateModalOpen] = useState(false);
@@ -34,6 +37,9 @@ function App() {
 			})
 			.catch((err: Error) => setError(err.message))
 			.finally(() => setLoading(false));
+		getMe()
+			.then((me) => setCanDelete(me.canDelete))
+			.catch(() => setCanDelete(false));
 	}, []);
 
 	const dishesById = useMemo(
@@ -72,38 +78,68 @@ function App() {
 		}
 	}
 
+	async function handleUpdateDish(id: string, input: { name: string; type: DishType }): Promise<Dish> {
+		const updated = await updateDish(id, input);
+		setDishes((prev) => prev.map((d) => (d.id === id ? updated : d)));
+		return updated;
+	}
+
+	async function handleDeleteDish(id: string): Promise<void> {
+		await deleteDish(id);
+		setDishes((prev) => prev.filter((d) => d.id !== id));
+	}
+
 	return (
 		<div className="app">
 			<header className="app__header">
 				<div className="app__header-row">
 					<div>
 						<h1>Piano pasti</h1>
-						{plan && <p className="app__week-range">{weekRangeLabel(plan)}</p>}
+						{view === "plan" && plan && <p className="app__week-range">{weekRangeLabel(plan)}</p>}
 					</div>
 					<div className="app__actions">
-						<button type="button" className="btn btn--ghost" onClick={() => setAddModalOpen(true)}>
-							Aggiungi piatto
-						</button>
 						<button
 							type="button"
-							className="btn btn--primary"
-							onClick={() => setRegenerateModalOpen(true)}
+							className="btn btn--ghost"
+							onClick={() => setView(view === "plan" ? "recipes" : "plan")}
 						>
-							Rigenera piano
+							{view === "plan" ? "Gestisci ricette" : "Torna al piano"}
 						</button>
+						{view === "plan" && (
+							<>
+								<button type="button" className="btn btn--ghost" onClick={() => setAddModalOpen(true)}>
+									Aggiungi piatto
+								</button>
+								<button
+									type="button"
+									className="btn btn--primary"
+									onClick={() => setRegenerateModalOpen(true)}
+								>
+									Rigenera piano
+								</button>
+							</>
+						)}
 					</div>
 				</div>
-				{swapError && <p className="app__status app__status--error">{swapError}</p>}
+				{view === "plan" && swapError && <p className="app__status app__status--error">{swapError}</p>}
 			</header>
 
 			<main className="app__main">
 				{loading && <p className="app__status">Caricamento…</p>}
 				{error && <p className="app__status app__status--error">Errore: {error}</p>}
-				{!loading && !error && !plan && (
+				{!loading && !error && view === "plan" && !plan && (
 					<p className="app__status">Nessun piano attivo. Genera il primo piano della settimana.</p>
 				)}
-				{!loading && !error && plan && (
+				{!loading && !error && view === "plan" && plan && (
 					<WeekView plan={plan} dishes={dishes} dishesById={dishesById} onSwap={handleSwap} />
+				)}
+				{!loading && !error && view === "recipes" && (
+					<RecipeList
+						dishes={dishes}
+						canDelete={canDelete}
+						onUpdate={handleUpdateDish}
+						onDelete={handleDeleteDish}
+					/>
 				)}
 			</main>
 
