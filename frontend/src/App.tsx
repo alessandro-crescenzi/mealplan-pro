@@ -4,9 +4,20 @@ import { WeekView } from "./components/WeekView";
 import { AddDishModal } from "./components/AddDishModal";
 import { ConfirmModal } from "./components/ConfirmModal";
 import { RecipeList } from "./components/RecipeList";
-import { addDish, deleteDish, generatePlan, getDishes, getMe, getPlan, swapDish, updateDish } from "./lib/api";
+import { OwnerSwitcher } from "./components/OwnerSwitcher";
+import {
+	addDish,
+	deleteDish,
+	generatePlan,
+	getDishes,
+	getMe,
+	getPlan,
+	getSharedWithMe,
+	swapDish,
+	updateDish,
+} from "./lib/api";
 import { addDays, mondayOf } from "./lib/week";
-import type { Dish, DishType, MealSlot, Plan } from "./lib/types";
+import type { Dish, DishType, IncomingShare, MealSlot, Plan } from "./lib/types";
 
 function weekRangeLabel(weekStart: string): string {
 	const start = new Date(`${weekStart}T00:00:00`);
@@ -34,12 +45,17 @@ function App() {
 	const currentWeekStart = useMemo(() => mondayOf(new Date()), []);
 	const nextWeekStart = useMemo(() => addDays(currentWeekStart, 7), [currentWeekStart]);
 	const [viewedWeekStart, setViewedWeekStart] = useState(currentWeekStart);
+	const [viewedOwnerEmail, setViewedOwnerEmail] = useState<string | null>(null);
+	const [sharedWithMe, setSharedWithMe] = useState<IncomingShare[]>([]);
 	const isFirstLoad = useRef(true);
+	const isOwnPlan = viewedOwnerEmail === null;
+	const canEditViewedPlan =
+		isOwnPlan || sharedWithMe.some((s) => s.ownerEmail === viewedOwnerEmail && s.permission === "edit");
 
 	useEffect(() => {
 		if (isFirstLoad.current) {
 			isFirstLoad.current = false;
-			Promise.all([getDishes(), getPlan(viewedWeekStart)])
+			Promise.all([getDishes(), getPlan(viewedWeekStart, viewedOwnerEmail ?? undefined)])
 				.then(([dishesResult, planResult]) => {
 					setDishes(dishesResult);
 					setPlan(planResult);
@@ -49,14 +65,17 @@ function App() {
 			getMe()
 				.then((me) => setCanDelete(me.canDelete))
 				.catch(() => setCanDelete(false));
+			getSharedWithMe()
+				.then(setSharedWithMe)
+				.catch(() => setSharedWithMe([]));
 			return;
 		}
 		setPlanLoading(true);
-		getPlan(viewedWeekStart)
+		getPlan(viewedWeekStart, viewedOwnerEmail ?? undefined)
 			.then(setPlan)
 			.catch((err: Error) => setError(err.message))
 			.finally(() => setPlanLoading(false));
-	}, [viewedWeekStart]);
+	}, [viewedWeekStart, viewedOwnerEmail]);
 
 	const dishesById = useMemo(
 		() => Object.fromEntries(dishes.map((d) => [d.id, d])),
@@ -73,7 +92,7 @@ function App() {
 		setRegenerating(true);
 		setRegenerateError(null);
 		try {
-			const newPlan = await generatePlan(viewedWeekStart);
+			const newPlan = await generatePlan(viewedWeekStart, viewedOwnerEmail ?? undefined);
 			setPlan(newPlan);
 			setRegenerateModalOpen(false);
 		} catch (err) {
@@ -87,7 +106,13 @@ function App() {
 		if (!dishId) return;
 		setSwapError(null);
 		try {
-			const newPlan = await swapDish({ weekStart: viewedWeekStart, date, slot, dishId });
+			const newPlan = await swapDish({
+				weekStart: viewedWeekStart,
+				date,
+				slot,
+				dishId,
+				ownerEmail: viewedOwnerEmail ?? undefined,
+			});
 			setPlan(newPlan);
 		} catch (err) {
 			setSwapError(err instanceof Error ? err.message : "Errore imprevisto.");
@@ -139,6 +164,13 @@ function App() {
 								</button>
 							</div>
 						)}
+						{view === "plan" && (
+							<OwnerSwitcher
+								viewedOwnerEmail={viewedOwnerEmail}
+								sharedWithMe={sharedWithMe}
+								onChange={setViewedOwnerEmail}
+							/>
+						)}
 						<button
 							type="button"
 							className="btn btn--ghost"
@@ -151,13 +183,15 @@ function App() {
 								<button type="button" className="btn btn--ghost" onClick={() => setAddModalOpen(true)}>
 									Aggiungi piatto
 								</button>
-								<button
-									type="button"
-									className="btn btn--primary"
-									onClick={() => setRegenerateModalOpen(true)}
-								>
-									Rigenera piano
-								</button>
+								{canEditViewedPlan && (
+									<button
+										type="button"
+										className="btn btn--primary"
+										onClick={() => setRegenerateModalOpen(true)}
+									>
+										Rigenera piano
+									</button>
+								)}
 							</>
 						)}
 					</div>
@@ -169,10 +203,20 @@ function App() {
 				{loading && <p className="app__status">Caricamento…</p>}
 				{error && <p className="app__status app__status--error">Errore: {error}</p>}
 				{!loading && !error && view === "plan" && !plan && (
-					<p className="app__status">Nessun piano per questa settimana. Genera il primo piano.</p>
+					<p className="app__status">
+						{canEditViewedPlan
+							? "Nessun piano per questa settimana. Genera il primo piano."
+							: "Nessun piano per questa settimana."}
+					</p>
 				)}
 				{!loading && !error && view === "plan" && plan && (
-					<WeekView plan={plan} dishes={dishes} dishesById={dishesById} onSwap={handleSwap} />
+					<WeekView
+						plan={plan}
+						dishes={dishes}
+						dishesById={dishesById}
+						onSwap={handleSwap}
+						readOnly={!canEditViewedPlan}
+					/>
 				)}
 				{!loading && !error && view === "recipes" && (
 					<RecipeList
