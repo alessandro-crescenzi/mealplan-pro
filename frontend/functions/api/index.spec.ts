@@ -534,6 +534,45 @@ describe("mealplan pages function API", () => {
 		expect((await readRes.json()) as { weekStart: string }).toMatchObject({ weekStart: "2026-09-28" });
 	});
 
+	it("a requester with 'view' permission can read the owner's plan", async () => {
+		const env = makeEnv();
+		await env.MEALPLAN_KV.put(
+			"dishes",
+			JSON.stringify([{ id: "dish", name: "Dish", type: "entrambi", weekendOnly: false }]),
+		);
+		await handleRequest(
+			new Request("http://example.com/api/plan/generate", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "owner@example.com",
+				},
+				body: JSON.stringify({ weekStart: "2026-09-28" }),
+			}),
+			env,
+		);
+		await handleRequest(
+			new Request("http://example.com/api/shares", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "owner@example.com",
+				},
+				body: JSON.stringify({ granteeEmail: "viewer@example.com", permission: "view" }),
+			}),
+			env,
+		);
+
+		const res = await handleRequest(
+			new Request("http://example.com/api/plan?ownerEmail=owner@example.com&weekStart=2026-09-28", {
+				headers: { "Cf-Access-Authenticated-User-Email": "viewer@example.com" },
+			}),
+			env,
+		);
+		expect(res.status).toBe(200);
+		expect((await res.json()) as { weekStart: string }).toMatchObject({ weekStart: "2026-09-28" });
+	});
+
 	it("a requester with 'edit' permission can generate a plan with mismatched-case ownerEmail and read it via lowercase", async () => {
 		const env = makeEnv();
 		await env.MEALPLAN_KV.put(

@@ -63,6 +63,7 @@ function App() {
 			isFirstLoad.current = false;
 			Promise.all([getDishes(), getPlan(viewedWeekStart, viewedOwnerEmail ?? undefined)])
 				.then(([dishesResult, planResult]) => {
+					setError(null);
 					setDishes(dishesResult);
 					setPlan(planResult);
 				})
@@ -81,7 +82,10 @@ function App() {
 		}
 		setPlanLoading(true);
 		getPlan(viewedWeekStart, viewedOwnerEmail ?? undefined)
-			.then(setPlan)
+			.then((planResult) => {
+				setError(null);
+				setPlan(planResult);
+			})
 			.catch((err: Error) => setError(err.message))
 			.finally(() => setPlanLoading(false));
 	}, [viewedWeekStart, viewedOwnerEmail]);
