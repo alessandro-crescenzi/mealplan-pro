@@ -6,6 +6,7 @@ import { ConfirmModal } from "./components/ConfirmModal";
 import { RecipeList } from "./components/RecipeList";
 import { OwnerSwitcher } from "./components/OwnerSwitcher";
 import { ShareModal } from "./components/ShareModal";
+import { UserBadge } from "./components/UserBadge";
 import {
 	addDish,
 	addShare,
