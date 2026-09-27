@@ -55,7 +55,10 @@ describe("mealplan pages function API", () => {
 		const res = await handleRequest(
 			new Request("http://example.com/api/plan/generate", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "owner@example.com",
+				},
 				body: JSON.stringify({ weekStart: "2026-09-28" }), // a Monday
 			}),
 			env,
@@ -75,7 +78,7 @@ describe("mealplan pages function API", () => {
 			JSON.stringify([{ id: "weekend-lunch", name: "Weekend Lunch", type: "pranzo", weekendOnly: true }]),
 		);
 		await env.MEALPLAN_KV.put(
-			"plan:2026-09-28",
+			"plan:owner@example.com:2026-09-28",
 			JSON.stringify({
 				weekStart: "2026-09-28",
 				days: [{ date: "2026-09-28", dayName: "Lunedì", isWeekend: false, pranzo: null, cena: null }],
@@ -84,7 +87,10 @@ describe("mealplan pages function API", () => {
 		const res = await handleRequest(
 			new Request("http://example.com/api/plan/swap", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "owner@example.com",
+				},
 				body: JSON.stringify({ weekStart: "2026-09-28", date: "2026-09-28", slot: "pranzo", dishId: "weekend-lunch" }),
 			}),
 			env,
@@ -94,7 +100,12 @@ describe("mealplan pages function API", () => {
 
 	it("GET /api/plan?weekStart=... returns null when no plan exists for that week", async () => {
 		const env = makeEnv();
-		const res = await handleRequest(new Request("http://example.com/api/plan?weekStart=2026-09-28"), env);
+		const res = await handleRequest(
+			new Request("http://example.com/api/plan?weekStart=2026-09-28", {
+				headers: { "Cf-Access-Authenticated-User-Email": "owner@example.com" },
+			}),
+			env,
+		);
 		expect(await res.json()).toBeNull();
 	});
 
@@ -104,10 +115,14 @@ describe("mealplan pages function API", () => {
 			"dishes",
 			JSON.stringify([{ id: "dish", name: "Dish", type: "entrambi", weekendOnly: false }]),
 		);
+		const headers = {
+			"Content-Type": "application/json",
+			"Cf-Access-Authenticated-User-Email": "owner@example.com",
+		};
 		await handleRequest(
 			new Request("http://example.com/api/plan/generate", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers,
 				body: JSON.stringify({ weekStart: "2026-09-28" }),
 			}),
 			env,
@@ -115,17 +130,24 @@ describe("mealplan pages function API", () => {
 		await handleRequest(
 			new Request("http://example.com/api/plan/generate", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers,
 				body: JSON.stringify({ weekStart: "2026-10-05" }),
 			}),
 			env,
 		);
 
 		const currentWeekRes = await handleRequest(
-			new Request("http://example.com/api/plan?weekStart=2026-09-28"),
+			new Request("http://example.com/api/plan?weekStart=2026-09-28", {
+				headers: { "Cf-Access-Authenticated-User-Email": "owner@example.com" },
+			}),
 			env,
 		);
-		const nextWeekRes = await handleRequest(new Request("http://example.com/api/plan?weekStart=2026-10-05"), env);
+		const nextWeekRes = await handleRequest(
+			new Request("http://example.com/api/plan?weekStart=2026-10-05", {
+				headers: { "Cf-Access-Authenticated-User-Email": "owner@example.com" },
+			}),
+			env,
+		);
 		expect((await currentWeekRes.json()) as { weekStart: string }).toMatchObject({ weekStart: "2026-09-28" });
 		expect((await nextWeekRes.json()) as { weekStart: string }).toMatchObject({ weekStart: "2026-10-05" });
 	});
@@ -376,5 +398,139 @@ describe("mealplan pages function API", () => {
 			env,
 		);
 		expect(await granteeIncoming.json()).toEqual([{ ownerEmail: "owner@example.com", permission: "view" }]);
+	});
+
+	it("GET /api/plan returns 401 when the Access header is missing", async () => {
+		const env = makeEnv();
+		const res = await handleRequest(new Request("http://example.com/api/plan?weekStart=2026-09-28"), env);
+		expect(res.status).toBe(401);
+	});
+
+	it("GET /api/plan returns 403 for a requester with no relationship to the owner", async () => {
+		const env = makeEnv();
+		const res = await handleRequest(
+			new Request("http://example.com/api/plan?ownerEmail=owner@example.com&weekStart=2026-09-28", {
+				headers: { "Cf-Access-Authenticated-User-Email": "stranger@example.com" },
+			}),
+			env,
+		);
+		expect(res.status).toBe(403);
+	});
+
+	it("a requester with only 'view' permission cannot generate a plan for the owner", async () => {
+		const env = makeEnv();
+		await env.MEALPLAN_KV.put(
+			"dishes",
+			JSON.stringify([{ id: "dish", name: "Dish", type: "entrambi", weekendOnly: false }]),
+		);
+		await handleRequest(
+			new Request("http://example.com/api/shares", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "owner@example.com",
+				},
+				body: JSON.stringify({ granteeEmail: "viewer@example.com", permission: "view" }),
+			}),
+			env,
+		);
+
+		const res = await handleRequest(
+			new Request("http://example.com/api/plan/generate", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "viewer@example.com",
+				},
+				body: JSON.stringify({ ownerEmail: "owner@example.com", weekStart: "2026-09-28" }),
+			}),
+			env,
+		);
+		expect(res.status).toBe(403);
+	});
+
+	it("a requester with only 'view' permission cannot swap a dish in the owner's plan", async () => {
+		const env = makeEnv();
+		await env.MEALPLAN_KV.put(
+			"dishes",
+			JSON.stringify([{ id: "dish", name: "Dish", type: "entrambi", weekendOnly: false }]),
+		);
+		await env.MEALPLAN_KV.put(
+			"plan:owner@example.com:2026-09-28",
+			JSON.stringify({
+				weekStart: "2026-09-28",
+				days: [{ date: "2026-09-28", dayName: "Lunedì", isWeekend: false, pranzo: null, cena: null }],
+			}),
+		);
+		await handleRequest(
+			new Request("http://example.com/api/shares", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "owner@example.com",
+				},
+				body: JSON.stringify({ granteeEmail: "viewer@example.com", permission: "view" }),
+			}),
+			env,
+		);
+
+		const res = await handleRequest(
+			new Request("http://example.com/api/plan/swap", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "viewer@example.com",
+				},
+				body: JSON.stringify({
+					ownerEmail: "owner@example.com",
+					weekStart: "2026-09-28",
+					date: "2026-09-28",
+					slot: "pranzo",
+					dishId: "dish",
+				}),
+			}),
+			env,
+		);
+		expect(res.status).toBe(403);
+	});
+
+	it("a requester with 'edit' permission can generate and read the owner's plan", async () => {
+		const env = makeEnv();
+		await env.MEALPLAN_KV.put(
+			"dishes",
+			JSON.stringify([{ id: "dish", name: "Dish", type: "entrambi", weekendOnly: false }]),
+		);
+		await handleRequest(
+			new Request("http://example.com/api/shares", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "owner@example.com",
+				},
+				body: JSON.stringify({ granteeEmail: "editor@example.com", permission: "edit" }),
+			}),
+			env,
+		);
+
+		const generateRes = await handleRequest(
+			new Request("http://example.com/api/plan/generate", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "editor@example.com",
+				},
+				body: JSON.stringify({ ownerEmail: "owner@example.com", weekStart: "2026-09-28" }),
+			}),
+			env,
+		);
+		expect(generateRes.status).toBe(200);
+
+		const readRes = await handleRequest(
+			new Request("http://example.com/api/plan?ownerEmail=owner@example.com&weekStart=2026-09-28", {
+				headers: { "Cf-Access-Authenticated-User-Email": "owner@example.com" },
+			}),
+			env,
+		);
+		expect((await readRes.json()) as { weekStart: string }).toMatchObject({ weekStart: "2026-09-28" });
 	});
 });

@@ -108,13 +108,13 @@ function canDeleteDishes(request: Request, env: Env): boolean {
 	return Boolean(email && env.ADMIN_EMAIL && email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase());
 }
 
-async function getPlan(env: Env, weekStart: string): Promise<Plan | null> {
-	const raw = await env.MEALPLAN_KV.get(planKey(weekStart));
+async function getPlan(env: Env, ownerEmail: string, weekStart: string): Promise<Plan | null> {
+	const raw = await env.MEALPLAN_KV.get(planKey(ownerEmail, weekStart));
 	return raw ? JSON.parse(raw) : null;
 }
 
-async function savePlan(env: Env, plan: Plan): Promise<void> {
-	await env.MEALPLAN_KV.put(planKey(plan.weekStart), JSON.stringify(plan));
+async function savePlan(env: Env, ownerEmail: string, plan: Plan): Promise<void> {
+	await env.MEALPLAN_KV.put(planKey(ownerEmail, plan.weekStart), JSON.stringify(plan));
 }
 
 async function getShares(env: Env, ownerEmail: string): Promise<ShareEntry[]> {
@@ -273,24 +273,39 @@ async function handleWhoAmI(request: Request, env: Env): Promise<Response> {
 }
 
 async function handleGetPlan(request: Request, env: Env): Promise<Response> {
+	const requesterEmail = getAuthenticatedEmail(request);
+	if (!requesterEmail) return unauthorized();
 	const url = new URL(request.url);
+	const ownerEmail = url.searchParams.get("ownerEmail") || requesterEmail;
+	if (!(await resolveAccess(env, requesterEmail, ownerEmail, "view"))) {
+		return json({ error: "Non hai accesso a questo piano." }, { status: 403 });
+	}
 	const weekStartParam = url.searchParams.get("weekStart");
 	const weekStart = formatDate(weekStartParam ? mondayOf(new Date(weekStartParam)) : mondayOf(new Date()));
-	const plan = await getPlan(env, weekStart);
+	const plan = await getPlan(env, ownerEmail, weekStart);
 	return json(plan);
 }
 
 async function handleGeneratePlan(request: Request, env: Env): Promise<Response> {
-	const body = (await request.json().catch(() => ({}))) as { weekStart?: string };
+	const requesterEmail = getAuthenticatedEmail(request);
+	if (!requesterEmail) return unauthorized();
+	const body = (await request.json().catch(() => ({}))) as { ownerEmail?: string; weekStart?: string };
+	const ownerEmail = body.ownerEmail || requesterEmail;
+	if (!(await resolveAccess(env, requesterEmail, ownerEmail, "edit"))) {
+		return json({ error: "Non hai i permessi per modificare questo piano." }, { status: 403 });
+	}
 	const dishes = await getDishes(env);
 	const weekStart = body.weekStart ? mondayOf(new Date(body.weekStart)) : mondayOf(new Date());
 	const plan = buildRandomPlan(dishes, weekStart);
-	await savePlan(env, plan);
+	await savePlan(env, ownerEmail, plan);
 	return json(plan);
 }
 
 async function handleSwapDish(request: Request, env: Env): Promise<Response> {
+	const requesterEmail = getAuthenticatedEmail(request);
+	if (!requesterEmail) return unauthorized();
 	const body = (await request.json().catch(() => null)) as {
+		ownerEmail?: string;
 		weekStart?: string;
 		date?: string;
 		slot?: MealSlot;
@@ -302,8 +317,12 @@ async function handleSwapDish(request: Request, env: Env): Promise<Response> {
 	if (body.slot !== "pranzo" && body.slot !== "cena") {
 		return json({ error: "'slot' deve essere 'pranzo' o 'cena'." }, { status: 400 });
 	}
+	const ownerEmail = body.ownerEmail || requesterEmail;
+	if (!(await resolveAccess(env, requesterEmail, ownerEmail, "edit"))) {
+		return json({ error: "Non hai i permessi per modificare questo piano." }, { status: 403 });
+	}
 
-	const plan = await getPlan(env, body.weekStart);
+	const plan = await getPlan(env, ownerEmail, body.weekStart);
 	if (!plan) {
 		return json({ error: "Nessun piano attivo. Generane uno prima." }, { status: 404 });
 	}
@@ -326,7 +345,7 @@ async function handleSwapDish(request: Request, env: Env): Promise<Response> {
 	}
 
 	day[body.slot] = dish.id;
-	await savePlan(env, plan);
+	await savePlan(env, ownerEmail, plan);
 	return json(plan);
 }
 
