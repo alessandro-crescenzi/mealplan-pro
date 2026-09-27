@@ -95,7 +95,8 @@ async function saveDishes(env: Env, dishes: Dish[]): Promise<void> {
 }
 
 function getAuthenticatedEmail(request: Request): string | null {
-	return request.headers.get("Cf-Access-Authenticated-User-Email");
+	const email = request.headers.get("Cf-Access-Authenticated-User-Email");
+	return email ? email.toLowerCase() : null;
 }
 
 function unauthorized(): Response {
@@ -343,10 +344,10 @@ async function handlePostShare(request: Request, env: Env): Promise<Response> {
 	if (!body || !body.granteeEmail || (body.permission !== "view" && body.permission !== "edit")) {
 		return json({ error: "Servono 'granteeEmail' e 'permission' ('view' o 'edit')." }, { status: 400 });
 	}
-	if (body.granteeEmail === requesterEmail) {
+	const granteeEmail = body.granteeEmail.toLowerCase();
+	if (granteeEmail === requesterEmail) {
 		return json({ error: "Non puoi condividere il piano con te stesso." }, { status: 400 });
 	}
-	const granteeEmail = body.granteeEmail;
 	const permission = body.permission;
 
 	const shares = await getShares(env, requesterEmail);

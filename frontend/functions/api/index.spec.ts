@@ -353,4 +353,28 @@ describe("mealplan pages function API", () => {
 		);
 		expect(await granteeIncoming.json()).toEqual([]);
 	});
+
+	it("POST /api/shares normalizes a mixed-case granteeEmail so it's visible via GET /api/shared-with-me queried in lowercase", async () => {
+		const env = makeEnv();
+		const shareRes = await handleRequest(
+			new Request("http://example.com/api/shares", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "owner@example.com",
+				},
+				body: JSON.stringify({ granteeEmail: "Friend@Example.com", permission: "view" }),
+			}),
+			env,
+		);
+		expect(shareRes.status).toBe(201);
+
+		const granteeIncoming = await handleRequest(
+			new Request("http://example.com/api/shared-with-me", {
+				headers: { "Cf-Access-Authenticated-User-Email": "friend@example.com" },
+			}),
+			env,
+		);
+		expect(await granteeIncoming.json()).toEqual([{ ownerEmail: "owner@example.com", permission: "view" }]);
+	});
 });
