@@ -211,4 +211,146 @@ describe("mealplan pages function API", () => {
 		);
 		expect(await res.json()).toEqual({ email: "admin@example.com", canDelete: true });
 	});
+
+	it("POST /api/shares requires authentication", async () => {
+		const env = makeEnv();
+		const res = await handleRequest(
+			new Request("http://example.com/api/shares", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ granteeEmail: "friend@example.com", permission: "view" }),
+			}),
+			env,
+		);
+		expect(res.status).toBe(401);
+	});
+
+	it("POST /api/shares rejects sharing with yourself", async () => {
+		const env = makeEnv();
+		const res = await handleRequest(
+			new Request("http://example.com/api/shares", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "owner@example.com",
+				},
+				body: JSON.stringify({ granteeEmail: "owner@example.com", permission: "view" }),
+			}),
+			env,
+		);
+		expect(res.status).toBe(400);
+	});
+
+	it("POST /api/shares adds a share visible via GET /api/shares and GET /api/shared-with-me", async () => {
+		const env = makeEnv();
+		const shareRes = await handleRequest(
+			new Request("http://example.com/api/shares", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "owner@example.com",
+				},
+				body: JSON.stringify({ granteeEmail: "friend@example.com", permission: "view" }),
+			}),
+			env,
+		);
+		expect(shareRes.status).toBe(201);
+
+		const ownerShares = await handleRequest(
+			new Request("http://example.com/api/shares", {
+				headers: { "Cf-Access-Authenticated-User-Email": "owner@example.com" },
+			}),
+			env,
+		);
+		expect(await ownerShares.json()).toEqual([{ granteeEmail: "friend@example.com", permission: "view" }]);
+
+		const granteeIncoming = await handleRequest(
+			new Request("http://example.com/api/shared-with-me", {
+				headers: { "Cf-Access-Authenticated-User-Email": "friend@example.com" },
+			}),
+			env,
+		);
+		expect(await granteeIncoming.json()).toEqual([{ ownerEmail: "owner@example.com", permission: "view" }]);
+	});
+
+	it("POST /api/shares called twice for the same grantee updates the permission instead of duplicating it", async () => {
+		const env = makeEnv();
+		const headers = {
+			"Content-Type": "application/json",
+			"Cf-Access-Authenticated-User-Email": "owner@example.com",
+		};
+		await handleRequest(
+			new Request("http://example.com/api/shares", {
+				method: "POST",
+				headers,
+				body: JSON.stringify({ granteeEmail: "friend@example.com", permission: "view" }),
+			}),
+			env,
+		);
+		await handleRequest(
+			new Request("http://example.com/api/shares", {
+				method: "POST",
+				headers,
+				body: JSON.stringify({ granteeEmail: "friend@example.com", permission: "edit" }),
+			}),
+			env,
+		);
+
+		const ownerShares = await handleRequest(
+			new Request("http://example.com/api/shares", {
+				headers: { "Cf-Access-Authenticated-User-Email": "owner@example.com" },
+			}),
+			env,
+		);
+		expect(await ownerShares.json()).toEqual([{ granteeEmail: "friend@example.com", permission: "edit" }]);
+
+		const granteeIncoming = await handleRequest(
+			new Request("http://example.com/api/shared-with-me", {
+				headers: { "Cf-Access-Authenticated-User-Email": "friend@example.com" },
+			}),
+			env,
+		);
+		expect(await granteeIncoming.json()).toEqual([{ ownerEmail: "owner@example.com", permission: "edit" }]);
+	});
+
+	it("DELETE /api/shares/:granteeEmail revokes access from both the owner's and grantee's indexes", async () => {
+		const env = makeEnv();
+		const headers = {
+			"Content-Type": "application/json",
+			"Cf-Access-Authenticated-User-Email": "owner@example.com",
+		};
+		await handleRequest(
+			new Request("http://example.com/api/shares", {
+				method: "POST",
+				headers,
+				body: JSON.stringify({ granteeEmail: "friend@example.com", permission: "edit" }),
+			}),
+			env,
+		);
+
+		const deleteRes = await handleRequest(
+			new Request("http://example.com/api/shares/friend%40example.com", {
+				method: "DELETE",
+				headers: { "Cf-Access-Authenticated-User-Email": "owner@example.com" },
+			}),
+			env,
+		);
+		expect(deleteRes.status).toBe(200);
+
+		const ownerShares = await handleRequest(
+			new Request("http://example.com/api/shares", {
+				headers: { "Cf-Access-Authenticated-User-Email": "owner@example.com" },
+			}),
+			env,
+		);
+		expect(await ownerShares.json()).toEqual([]);
+
+		const granteeIncoming = await handleRequest(
+			new Request("http://example.com/api/shared-with-me", {
+				headers: { "Cf-Access-Authenticated-User-Email": "friend@example.com" },
+			}),
+			env,
+		);
+		expect(await granteeIncoming.json()).toEqual([]);
+	});
 });

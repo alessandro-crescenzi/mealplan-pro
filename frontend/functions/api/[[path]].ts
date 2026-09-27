@@ -24,6 +24,7 @@ interface Dish {
 }
 
 type MealSlot = "pranzo" | "cena";
+type Permission = "view" | "edit";
 
 interface PlanDay {
 	date: string;
@@ -38,11 +39,28 @@ interface Plan {
 	days: PlanDay[];
 }
 
-const DISHES_KEY = "dishes";
-const PLAN_KEY_PREFIX = "plan:";
+interface ShareEntry {
+	granteeEmail: string;
+	permission: Permission;
+}
 
-function planKey(weekStart: string): string {
-	return `${PLAN_KEY_PREFIX}${weekStart}`;
+interface IncomingShare {
+	ownerEmail: string;
+	permission: Permission;
+}
+
+const DISHES_KEY = "dishes";
+
+function planKey(ownerEmail: string, weekStart: string): string {
+	return `plan:${ownerEmail}:${weekStart}`;
+}
+
+function sharesKey(ownerEmail: string): string {
+	return `shares:${ownerEmail}`;
+}
+
+function sharedWithKey(granteeEmail: string): string {
+	return `shared-with:${granteeEmail}`;
 }
 
 const DAY_NAMES = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
@@ -80,6 +98,10 @@ function getAuthenticatedEmail(request: Request): string | null {
 	return request.headers.get("Cf-Access-Authenticated-User-Email");
 }
 
+function unauthorized(): Response {
+	return json({ error: "Autenticazione mancante." }, { status: 401 });
+}
+
 function canDeleteDishes(request: Request, env: Env): boolean {
 	const email = getAuthenticatedEmail(request);
 	return Boolean(email && env.ADMIN_EMAIL && email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase());
@@ -92,6 +114,42 @@ async function getPlan(env: Env, weekStart: string): Promise<Plan | null> {
 
 async function savePlan(env: Env, plan: Plan): Promise<void> {
 	await env.MEALPLAN_KV.put(planKey(plan.weekStart), JSON.stringify(plan));
+}
+
+async function getShares(env: Env, ownerEmail: string): Promise<ShareEntry[]> {
+	const raw = await env.MEALPLAN_KV.get(sharesKey(ownerEmail));
+	return raw ? JSON.parse(raw) : [];
+}
+
+async function saveShares(env: Env, ownerEmail: string, shares: ShareEntry[]): Promise<void> {
+	await env.MEALPLAN_KV.put(sharesKey(ownerEmail), JSON.stringify(shares));
+}
+
+async function getSharedWith(env: Env, granteeEmail: string): Promise<IncomingShare[]> {
+	const raw = await env.MEALPLAN_KV.get(sharedWithKey(granteeEmail));
+	return raw ? JSON.parse(raw) : [];
+}
+
+async function saveSharedWith(env: Env, granteeEmail: string, incoming: IncomingShare[]): Promise<void> {
+	await env.MEALPLAN_KV.put(sharedWithKey(granteeEmail), JSON.stringify(incoming));
+}
+
+function permissionCovers(granted: Permission, required: Permission): boolean {
+	if (granted === "edit") return true;
+	return required === "view";
+}
+
+async function resolveAccess(
+	env: Env,
+	requesterEmail: string,
+	ownerEmail: string,
+	required: Permission,
+): Promise<boolean> {
+	if (requesterEmail === ownerEmail) return true;
+	const incoming = await getSharedWith(env, requesterEmail);
+	const entry = incoming.find((s) => s.ownerEmail === ownerEmail);
+	if (!entry) return false;
+	return permissionCovers(entry.permission, required);
 }
 
 function mondayOf(date: Date): Date {
@@ -271,6 +329,75 @@ async function handleSwapDish(request: Request, env: Env): Promise<Response> {
 	return json(plan);
 }
 
+async function handleGetShares(request: Request, env: Env): Promise<Response> {
+	const requesterEmail = getAuthenticatedEmail(request);
+	if (!requesterEmail) return unauthorized();
+	const shares = await getShares(env, requesterEmail);
+	return json(shares);
+}
+
+async function handlePostShare(request: Request, env: Env): Promise<Response> {
+	const requesterEmail = getAuthenticatedEmail(request);
+	if (!requesterEmail) return unauthorized();
+	const body = (await request.json().catch(() => null)) as { granteeEmail?: string; permission?: string } | null;
+	if (!body || !body.granteeEmail || (body.permission !== "view" && body.permission !== "edit")) {
+		return json({ error: "Servono 'granteeEmail' e 'permission' ('view' o 'edit')." }, { status: 400 });
+	}
+	if (body.granteeEmail === requesterEmail) {
+		return json({ error: "Non puoi condividere il piano con te stesso." }, { status: 400 });
+	}
+	const granteeEmail = body.granteeEmail;
+	const permission = body.permission;
+
+	const shares = await getShares(env, requesterEmail);
+	const shareIndex = shares.findIndex((s) => s.granteeEmail === granteeEmail);
+	if (shareIndex === -1) {
+		shares.push({ granteeEmail, permission });
+	} else {
+		shares[shareIndex] = { granteeEmail, permission };
+	}
+	await saveShares(env, requesterEmail, shares);
+
+	const incoming = await getSharedWith(env, granteeEmail);
+	const incomingIndex = incoming.findIndex((s) => s.ownerEmail === requesterEmail);
+	if (incomingIndex === -1) {
+		incoming.push({ ownerEmail: requesterEmail, permission });
+	} else {
+		incoming[incomingIndex] = { ownerEmail: requesterEmail, permission };
+	}
+	await saveSharedWith(env, granteeEmail, incoming);
+
+	return json(shares, { status: 201 });
+}
+
+async function handleDeleteShare(request: Request, env: Env, granteeEmail: string): Promise<Response> {
+	const requesterEmail = getAuthenticatedEmail(request);
+	if (!requesterEmail) return unauthorized();
+
+	const shares = await getShares(env, requesterEmail);
+	await saveShares(
+		env,
+		requesterEmail,
+		shares.filter((s) => s.granteeEmail !== granteeEmail),
+	);
+
+	const incoming = await getSharedWith(env, granteeEmail);
+	await saveSharedWith(
+		env,
+		granteeEmail,
+		incoming.filter((s) => s.ownerEmail !== requesterEmail),
+	);
+
+	return json({ ok: true });
+}
+
+async function handleGetSharedWithMe(request: Request, env: Env): Promise<Response> {
+	const requesterEmail = getAuthenticatedEmail(request);
+	if (!requesterEmail) return unauthorized();
+	const incoming = await getSharedWith(env, requesterEmail);
+	return json(incoming);
+}
+
 export async function handleRequest(request: Request, env: Env): Promise<Response> {
 	const url = new URL(request.url);
 	const { pathname } = url;
@@ -301,6 +428,19 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
 		}
 		if (pathname === "/api/plan/swap" && method === "POST") {
 			return await handleSwapDish(request, env);
+		}
+		if (pathname === "/api/shares" && method === "GET") {
+			return await handleGetShares(request, env);
+		}
+		if (pathname === "/api/shares" && method === "POST") {
+			return await handlePostShare(request, env);
+		}
+		const shareMatch = pathname.match(/^\/api\/shares\/([^/]+)$/);
+		if (shareMatch && method === "DELETE") {
+			return await handleDeleteShare(request, env, decodeURIComponent(shareMatch[1]));
+		}
+		if (pathname === "/api/shared-with-me" && method === "GET") {
+			return await handleGetSharedWithMe(request, env);
 		}
 		return json({ error: "Not found" }, { status: 404 });
 	} catch (err) {
