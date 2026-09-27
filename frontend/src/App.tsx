@@ -39,6 +39,7 @@ function App() {
 	const [error, setError] = useState<string | null>(null);
 	const [view, setView] = useState<"plan" | "recipes">("plan");
 	const [canDelete, setCanDelete] = useState(false);
+	const [userEmail, setUserEmail] = useState<string | null>(null);
 
 	const [isAddModalOpen, setAddModalOpen] = useState(false);
 	const [isRegenerateModalOpen, setRegenerateModalOpen] = useState(false);
@@ -70,7 +71,10 @@ function App() {
 				.catch((err: Error) => setError(err.message))
 				.finally(() => setLoading(false));
 			getMe()
-				.then((me) => setCanDelete(me.canDelete))
+				.then((me) => {
+					setCanDelete(me.canDelete);
+					setUserEmail(me.email);
+				})
 				.catch(() => setCanDelete(false));
 			getSharedWithMe()
 				.then(setSharedWithMe)
@@ -155,6 +159,9 @@ function App() {
 
 	return (
 		<div className="app">
+			<div className="app__topbar">
+				<UserBadge email={userEmail} />
+			</div>
 			<header className="app__header">
 				<div className="app__header-row">
 					<div>
