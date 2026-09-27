@@ -25,6 +25,11 @@
 	flex-wrap: wrap;
 }
 
+.app__week-nav {
+	display: flex;
+	gap: 8px;
+}
+
 .app__header h1 {
 	font-size: 28px;
 	letter-spacing: -0.5px;

@@ -75,7 +75,7 @@ describe("mealplan pages function API", () => {
 			JSON.stringify([{ id: "weekend-lunch", name: "Weekend Lunch", type: "pranzo", weekendOnly: true }]),
 		);
 		await env.MEALPLAN_KV.put(
-			"plan",
+			"plan:2026-09-28",
 			JSON.stringify({
 				weekStart: "2026-09-28",
 				days: [{ date: "2026-09-28", dayName: "Lunedì", isWeekend: false, pranzo: null, cena: null }],
@@ -85,11 +85,49 @@ describe("mealplan pages function API", () => {
 			new Request("http://example.com/api/plan/swap", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ date: "2026-09-28", slot: "pranzo", dishId: "weekend-lunch" }),
+				body: JSON.stringify({ weekStart: "2026-09-28", date: "2026-09-28", slot: "pranzo", dishId: "weekend-lunch" }),
 			}),
 			env,
 		);
 		expect(res.status).toBe(400);
+	});
+
+	it("GET /api/plan?weekStart=... returns null when no plan exists for that week", async () => {
+		const env = makeEnv();
+		const res = await handleRequest(new Request("http://example.com/api/plan?weekStart=2026-09-28"), env);
+		expect(await res.json()).toBeNull();
+	});
+
+	it("generating a plan for one week does not overwrite another week's plan", async () => {
+		const env = makeEnv();
+		await env.MEALPLAN_KV.put(
+			"dishes",
+			JSON.stringify([{ id: "dish", name: "Dish", type: "entrambi", weekendOnly: false }]),
+		);
+		await handleRequest(
+			new Request("http://example.com/api/plan/generate", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ weekStart: "2026-09-28" }),
+			}),
+			env,
+		);
+		await handleRequest(
+			new Request("http://example.com/api/plan/generate", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ weekStart: "2026-10-05" }),
+			}),
+			env,
+		);
+
+		const currentWeekRes = await handleRequest(
+			new Request("http://example.com/api/plan?weekStart=2026-09-28"),
+			env,
+		);
+		const nextWeekRes = await handleRequest(new Request("http://example.com/api/plan?weekStart=2026-10-05"), env);
+		expect((await currentWeekRes.json()) as { weekStart: string }).toMatchObject({ weekStart: "2026-09-28" });
+		expect((await nextWeekRes.json()) as { weekStart: string }).toMatchObject({ weekStart: "2026-10-05" });
 	});
 
 	it("responds 404 for unknown routes", async () => {

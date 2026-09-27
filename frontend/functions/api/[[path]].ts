@@ -39,7 +39,11 @@ interface Plan {
 }
 
 const DISHES_KEY = "dishes";
-const PLAN_KEY = "plan";
+const PLAN_KEY_PREFIX = "plan:";
+
+function planKey(weekStart: string): string {
+	return `${PLAN_KEY_PREFIX}${weekStart}`;
+}
 
 const DAY_NAMES = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
 
@@ -81,13 +85,13 @@ function canDeleteDishes(request: Request, env: Env): boolean {
 	return Boolean(email && env.ADMIN_EMAIL && email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase());
 }
 
-async function getPlan(env: Env): Promise<Plan | null> {
-	const raw = await env.MEALPLAN_KV.get(PLAN_KEY);
+async function getPlan(env: Env, weekStart: string): Promise<Plan | null> {
+	const raw = await env.MEALPLAN_KV.get(planKey(weekStart));
 	return raw ? JSON.parse(raw) : null;
 }
 
 async function savePlan(env: Env, plan: Plan): Promise<void> {
-	await env.MEALPLAN_KV.put(PLAN_KEY, JSON.stringify(plan));
+	await env.MEALPLAN_KV.put(planKey(plan.weekStart), JSON.stringify(plan));
 }
 
 function mondayOf(date: Date): Date {
@@ -209,8 +213,11 @@ async function handleWhoAmI(request: Request, env: Env): Promise<Response> {
 	});
 }
 
-async function handleGetPlan(env: Env): Promise<Response> {
-	const plan = await getPlan(env);
+async function handleGetPlan(request: Request, env: Env): Promise<Response> {
+	const url = new URL(request.url);
+	const weekStartParam = url.searchParams.get("weekStart");
+	const weekStart = formatDate(weekStartParam ? mondayOf(new Date(weekStartParam)) : mondayOf(new Date()));
+	const plan = await getPlan(env, weekStart);
 	return json(plan);
 }
 
@@ -225,18 +232,19 @@ async function handleGeneratePlan(request: Request, env: Env): Promise<Response>
 
 async function handleSwapDish(request: Request, env: Env): Promise<Response> {
 	const body = (await request.json().catch(() => null)) as {
+		weekStart?: string;
 		date?: string;
 		slot?: MealSlot;
 		dishId?: string;
 	} | null;
-	if (!body || !body.date || !body.slot || !body.dishId) {
-		return json({ error: "Servono 'date', 'slot' e 'dishId'." }, { status: 400 });
+	if (!body || !body.weekStart || !body.date || !body.slot || !body.dishId) {
+		return json({ error: "Servono 'weekStart', 'date', 'slot' e 'dishId'." }, { status: 400 });
 	}
 	if (body.slot !== "pranzo" && body.slot !== "cena") {
 		return json({ error: "'slot' deve essere 'pranzo' o 'cena'." }, { status: 400 });
 	}
 
-	const plan = await getPlan(env);
+	const plan = await getPlan(env, body.weekStart);
 	if (!plan) {
 		return json({ error: "Nessun piano attivo. Generane uno prima." }, { status: 404 });
 	}
@@ -286,7 +294,7 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
 			return await handleWhoAmI(request, env);
 		}
 		if (pathname === "/api/plan" && method === "GET") {
-			return await handleGetPlan(env);
+			return await handleGetPlan(request, env);
 		}
 		if (pathname === "/api/plan/generate" && method === "POST") {
 			return await handleGeneratePlan(request, env);

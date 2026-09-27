@@ -16,11 +16,11 @@ export function getDishes(): Promise<Dish[]> {
 	return request<Dish[]>("/api/dishes");
 }
 
-export function getPlan(): Promise<Plan | null> {
-	return request<Plan | null>("/api/plan");
+export function getPlan(weekStart: string): Promise<Plan | null> {
+	return request<Plan | null>(`/api/plan?weekStart=${encodeURIComponent(weekStart)}`);
 }
 
-export function generatePlan(weekStart?: string): Promise<Plan> {
+export function generatePlan(weekStart: string): Promise<Plan> {
 	return request<Plan>("/api/plan/generate", {
 		method: "POST",
 		body: JSON.stringify({ weekStart }),
@@ -34,7 +34,7 @@ export function addDish(input: { name: string; type: DishType; weekendOnly?: boo
 	});
 }
 
-export function swapDish(input: { date: string; slot: MealSlot; dishId: string }): Promise<Plan> {
+export function swapDish(input: { weekStart: string; date: string; slot: MealSlot; dishId: string }): Promise<Plan> {
 	return request<Plan>("/api/plan/swap", {
 		method: "POST",
 		body: JSON.stringify(input),

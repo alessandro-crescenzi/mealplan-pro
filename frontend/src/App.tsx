@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { WeekView } from "./components/WeekView";
 import { AddDishModal } from "./components/AddDishModal";
 import { ConfirmModal } from "./components/ConfirmModal";
 import { RecipeList } from "./components/RecipeList";
 import { addDish, deleteDish, generatePlan, getDishes, getMe, getPlan, swapDish, updateDish } from "./lib/api";
+import { addDays, mondayOf } from "./lib/week";
 import type { Dish, DishType, MealSlot, Plan } from "./lib/types";
 
-function weekRangeLabel(plan: Plan): string {
-	const start = new Date(`${plan.weekStart}T00:00:00`);
+function weekRangeLabel(weekStart: string): string {
+	const start = new Date(`${weekStart}T00:00:00`);
 	const end = new Date(start);
 	end.setDate(end.getDate() + 6);
 	const fmt = (d: Date) => d.toLocaleDateString("it-IT", { day: "numeric", month: "long" });
@@ -19,6 +20,7 @@ function App() {
 	const [dishes, setDishes] = useState<Dish[]>([]);
 	const [plan, setPlan] = useState<Plan | null>(null);
 	const [loading, setLoading] = useState(true);
+	const [planLoading, setPlanLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [view, setView] = useState<"plan" | "recipes">("plan");
 	const [canDelete, setCanDelete] = useState(false);
@@ -29,18 +31,32 @@ function App() {
 	const [regenerateError, setRegenerateError] = useState<string | null>(null);
 	const [swapError, setSwapError] = useState<string | null>(null);
 
+	const currentWeekStart = useMemo(() => mondayOf(new Date()), []);
+	const nextWeekStart = useMemo(() => addDays(currentWeekStart, 7), [currentWeekStart]);
+	const [viewedWeekStart, setViewedWeekStart] = useState(currentWeekStart);
+	const isFirstLoad = useRef(true);
+
 	useEffect(() => {
-		Promise.all([getDishes(), getPlan()])
-			.then(([dishesResult, planResult]) => {
-				setDishes(dishesResult);
-				setPlan(planResult);
-			})
+		if (isFirstLoad.current) {
+			isFirstLoad.current = false;
+			Promise.all([getDishes(), getPlan(viewedWeekStart)])
+				.then(([dishesResult, planResult]) => {
+					setDishes(dishesResult);
+					setPlan(planResult);
+				})
+				.catch((err: Error) => setError(err.message))
+				.finally(() => setLoading(false));
+			getMe()
+				.then((me) => setCanDelete(me.canDelete))
+				.catch(() => setCanDelete(false));
+			return;
+		}
+		setPlanLoading(true);
+		getPlan(viewedWeekStart)
+			.then(setPlan)
 			.catch((err: Error) => setError(err.message))
-			.finally(() => setLoading(false));
-		getMe()
-			.then((me) => setCanDelete(me.canDelete))
-			.catch(() => setCanDelete(false));
-	}, []);
+			.finally(() => setPlanLoading(false));
+	}, [viewedWeekStart]);
 
 	const dishesById = useMemo(
 		() => Object.fromEntries(dishes.map((d) => [d.id, d])),
@@ -57,7 +73,7 @@ function App() {
 		setRegenerating(true);
 		setRegenerateError(null);
 		try {
-			const newPlan = await generatePlan();
+			const newPlan = await generatePlan(viewedWeekStart);
 			setPlan(newPlan);
 			setRegenerateModalOpen(false);
 		} catch (err) {
@@ -71,7 +87,7 @@ function App() {
 		if (!dishId) return;
 		setSwapError(null);
 		try {
-			const newPlan = await swapDish({ date, slot, dishId });
+			const newPlan = await swapDish({ weekStart: viewedWeekStart, date, slot, dishId });
 			setPlan(newPlan);
 		} catch (err) {
 			setSwapError(err instanceof Error ? err.message : "Errore imprevisto.");
@@ -95,9 +111,34 @@ function App() {
 				<div className="app__header-row">
 					<div>
 						<h1>Piano pasti</h1>
-						{view === "plan" && plan && <p className="app__week-range">{weekRangeLabel(plan)}</p>}
+						{view === "plan" && (
+							<p className="app__week-range">
+								{weekRangeLabel(viewedWeekStart)}
+								{planLoading && " · aggiornamento…"}
+							</p>
+						)}
 					</div>
 					<div className="app__actions">
+						{view === "plan" && (
+							<div className="app__week-nav">
+								<button
+									type="button"
+									className="btn btn--ghost"
+									disabled={viewedWeekStart === currentWeekStart}
+									onClick={() => setViewedWeekStart(currentWeekStart)}
+								>
+									‹ Settimana attuale
+								</button>
+								<button
+									type="button"
+									className="btn btn--ghost"
+									disabled={viewedWeekStart === nextWeekStart}
+									onClick={() => setViewedWeekStart(nextWeekStart)}
+								>
+									Settimana successiva ›
+								</button>
+							</div>
+						)}
 						<button
 							type="button"
 							className="btn btn--ghost"
@@ -128,7 +169,7 @@ function App() {
 				{loading && <p className="app__status">Caricamento…</p>}
 				{error && <p className="app__status app__status--error">Errore: {error}</p>}
 				{!loading && !error && view === "plan" && !plan && (
-					<p className="app__status">Nessun piano attivo. Genera il primo piano della settimana.</p>
+					<p className="app__status">Nessun piano per questa settimana. Genera il primo piano.</p>
 				)}
 				{!loading && !error && view === "plan" && plan && (
 					<WeekView plan={plan} dishes={dishes} dishesById={dishesById} onSwap={handleSwap} />
@@ -150,7 +191,7 @@ function App() {
 			{isRegenerateModalOpen && (
 				<ConfirmModal
 					title="Rigenera piano"
-					message="Generare un nuovo piano casuale sovrascriverà quello attuale. Continuare?"
+					message={`Generare un nuovo piano casuale sovrascriverà quello della settimana ${weekRangeLabel(viewedWeekStart)}. Continuare?`}
 					confirmLabel="Rigenera"
 					pending={regenerating}
 					error={regenerateError}
