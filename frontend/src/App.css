@@ -228,6 +228,68 @@
 	font-size: 14px;
 }
 
+.recipe-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.recipe-list__row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	padding: 12px 16px;
+}
+
+.recipe-list__info {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+.recipe-list__name {
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--text-h);
+}
+
+.recipe-list__badge {
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--accent);
+	background: color-mix(in srgb, var(--accent) 12%, transparent);
+	padding: 3px 8px;
+	border-radius: 999px;
+}
+
+.recipe-list__badge--weekend {
+	color: var(--accent-weekend);
+	background: color-mix(in srgb, var(--accent-weekend) 15%, transparent);
+}
+
+.recipe-list__actions {
+	display: flex;
+	gap: 8px;
+}
+
+.btn--danger {
+	background: #c0392b;
+	color: white;
+}
+
+.btn--danger:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
 @media (max-width: 640px) {
 	.week-grid {
 		grid-template-columns: 1fr;

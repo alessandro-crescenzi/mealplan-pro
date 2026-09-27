@@ -14,8 +14,8 @@ class MemoryKV {
 	}
 }
 
-function makeEnv(): Env {
-	return { MEALPLAN_KV: new MemoryKV() };
+function makeEnv(adminEmail?: string): Env {
+	return { MEALPLAN_KV: new MemoryKV(), ADMIN_EMAIL: adminEmail };
 }
 
 describe("mealplan pages function API", () => {
@@ -96,5 +96,81 @@ describe("mealplan pages function API", () => {
 		const env = makeEnv();
 		const res = await handleRequest(new Request("http://example.com/nope"), env);
 		expect(res.status).toBe(404);
+	});
+
+	it("PUT /api/dishes/:id updates name and type without changing the id", async () => {
+		const env = makeEnv();
+		await env.MEALPLAN_KV.put(
+			"dishes",
+			JSON.stringify([{ id: "pasta-al-pesto", name: "Pasta al pesto", type: "pranzo", weekendOnly: false }]),
+		);
+		const res = await handleRequest(
+			new Request("http://example.com/api/dishes/pasta-al-pesto", {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ name: "Pasta al pesto genovese", type: "cena" }),
+			}),
+			env,
+		);
+		expect(res.status).toBe(200);
+		const dish = (await res.json()) as { id: string; name: string; type: string };
+		expect(dish.id).toBe("pasta-al-pesto");
+		expect(dish.name).toBe("Pasta al pesto genovese");
+		expect(dish.type).toBe("cena");
+	});
+
+	it("PUT /api/dishes/:id returns 404 for an unknown dish", async () => {
+		const env = makeEnv();
+		const res = await handleRequest(
+			new Request("http://example.com/api/dishes/does-not-exist", {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ name: "Nome", type: "pranzo" }),
+			}),
+			env,
+		);
+		expect(res.status).toBe(404);
+	});
+
+	it("DELETE /api/dishes/:id is rejected without the authorized admin email", async () => {
+		const env = makeEnv("admin@example.com");
+		await env.MEALPLAN_KV.put(
+			"dishes",
+			JSON.stringify([{ id: "pasta-al-pesto", name: "Pasta al pesto", type: "pranzo", weekendOnly: false }]),
+		);
+		const res = await handleRequest(
+			new Request("http://example.com/api/dishes/pasta-al-pesto", { method: "DELETE" }),
+			env,
+		);
+		expect(res.status).toBe(403);
+		expect(await env.MEALPLAN_KV.get("dishes")).toContain("pasta-al-pesto");
+	});
+
+	it("DELETE /api/dishes/:id succeeds for the authorized admin email", async () => {
+		const env = makeEnv("admin@example.com");
+		await env.MEALPLAN_KV.put(
+			"dishes",
+			JSON.stringify([{ id: "pasta-al-pesto", name: "Pasta al pesto", type: "pranzo", weekendOnly: false }]),
+		);
+		const res = await handleRequest(
+			new Request("http://example.com/api/dishes/pasta-al-pesto", {
+				method: "DELETE",
+				headers: { "Cf-Access-Authenticated-User-Email": "admin@example.com" },
+			}),
+			env,
+		);
+		expect(res.status).toBe(200);
+		expect(await env.MEALPLAN_KV.get("dishes")).toBe("[]");
+	});
+
+	it("GET /api/me reports canDelete based on the Access header", async () => {
+		const env = makeEnv("admin@example.com");
+		const res = await handleRequest(
+			new Request("http://example.com/api/me", {
+				headers: { "Cf-Access-Authenticated-User-Email": "admin@example.com" },
+			}),
+			env,
+		);
+		expect(await res.json()).toEqual({ email: "admin@example.com", canDelete: true });
 	});
 });

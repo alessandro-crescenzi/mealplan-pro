@@ -8,4 +8,7 @@
 			"id": "185ae7ed734447cd8a601895f547c159",
 		},
 	],
+	"vars": {
+		"ADMIN_EMAIL": "alessandrocrescenzi980@gmail.com",
+	},
 }

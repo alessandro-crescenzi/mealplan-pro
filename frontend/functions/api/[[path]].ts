@@ -6,6 +6,7 @@ interface KVNamespace {
 
 export interface Env {
 	MEALPLAN_KV: KVNamespace;
+	ADMIN_EMAIL?: string;
 }
 
 interface EventContext<E> {
@@ -69,6 +70,15 @@ async function getDishes(env: Env): Promise<Dish[]> {
 
 async function saveDishes(env: Env, dishes: Dish[]): Promise<void> {
 	await env.MEALPLAN_KV.put(DISHES_KEY, JSON.stringify(dishes));
+}
+
+function getAuthenticatedEmail(request: Request): string | null {
+	return request.headers.get("Cf-Access-Authenticated-User-Email");
+}
+
+function canDeleteDishes(request: Request, env: Env): boolean {
+	const email = getAuthenticatedEmail(request);
+	return Boolean(email && env.ADMIN_EMAIL && email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase());
 }
 
 async function getPlan(env: Env): Promise<Plan | null> {
@@ -158,6 +168,47 @@ async function handleCreateDish(request: Request, env: Env): Promise<Response> {
 	return json(dish, { status: 201 });
 }
 
+async function handleUpdateDish(request: Request, env: Env, id: string): Promise<Response> {
+	const body = (await request.json().catch(() => null)) as Partial<Dish> | null;
+	if (!body || typeof body.name !== "string" || !body.name.trim()) {
+		return json({ error: "Il campo 'name' è obbligatorio." }, { status: 400 });
+	}
+	if (body.type !== "pranzo" && body.type !== "cena" && body.type !== "entrambi") {
+		return json({ error: "Il campo 'type' deve essere 'pranzo', 'cena' o 'entrambi'." }, { status: 400 });
+	}
+
+	const dishes = await getDishes(env);
+	const dish = dishes.find((d) => d.id === id);
+	if (!dish) {
+		return json({ error: `Piatto '${id}' non trovato.` }, { status: 404 });
+	}
+	dish.name = body.name.trim();
+	dish.type = body.type;
+	await saveDishes(env, dishes);
+	return json(dish);
+}
+
+async function handleDeleteDish(request: Request, env: Env, id: string): Promise<Response> {
+	if (!canDeleteDishes(request, env)) {
+		return json({ error: "Non sei autorizzato a eliminare le ricette." }, { status: 403 });
+	}
+	const dishes = await getDishes(env);
+	const index = dishes.findIndex((d) => d.id === id);
+	if (index === -1) {
+		return json({ error: `Piatto '${id}' non trovato.` }, { status: 404 });
+	}
+	dishes.splice(index, 1);
+	await saveDishes(env, dishes);
+	return json({ ok: true });
+}
+
+async function handleWhoAmI(request: Request, env: Env): Promise<Response> {
+	return json({
+		email: getAuthenticatedEmail(request),
+		canDelete: canDeleteDishes(request, env),
+	});
+}
+
 async function handleGetPlan(env: Env): Promise<Response> {
 	const plan = await getPlan(env);
 	return json(plan);
@@ -223,6 +274,16 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
 		}
 		if (pathname === "/api/dishes" && method === "POST") {
 			return await handleCreateDish(request, env);
+		}
+		const dishMatch = pathname.match(/^\/api\/dishes\/([^/]+)$/);
+		if (dishMatch && method === "PUT") {
+			return await handleUpdateDish(request, env, decodeURIComponent(dishMatch[1]));
+		}
+		if (dishMatch && method === "DELETE") {
+			return await handleDeleteDish(request, env, decodeURIComponent(dishMatch[1]));
+		}
+		if (pathname === "/api/me" && method === "GET") {
+			return await handleWhoAmI(request, env);
 		}
 		if (pathname === "/api/plan" && method === "GET") {
 			return await handleGetPlan(env);
