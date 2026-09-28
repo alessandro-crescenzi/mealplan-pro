@@ -15,12 +15,14 @@ interface EventContext<E> {
 }
 
 type DishType = "pranzo" | "cena" | "entrambi";
+type DishCategory = "piatto" | "contorno";
 
 interface Dish {
 	id: string;
 	name: string;
 	type: DishType;
 	weekendOnly: boolean;
+	category: DishCategory;
 }
 
 type MealSlot = "pranzo" | "cena";
@@ -32,6 +34,8 @@ interface PlanDay {
 	isWeekend: boolean;
 	pranzo: string | null;
 	cena: string | null;
+	pranzoContorno: string | null;
+	cenaContorno: string | null;
 }
 
 interface Plan {
@@ -170,8 +174,13 @@ function pickRandom<T>(items: T[]): T | null {
 	return items[Math.floor(Math.random() * items.length)];
 }
 
+function isContorno(dish: Dish): boolean {
+	return dish.category === "contorno";
+}
+
 function dishesForSlot(dishes: Dish[], slot: MealSlot, isWeekend: boolean): Dish[] {
 	return dishes.filter((d) => {
+		if (isContorno(d)) return false;
 		const matchesSlot = d.type === slot || d.type === "entrambi";
 		if (!matchesSlot) return false;
 		if (d.weekendOnly && !isWeekend) return false;
@@ -193,6 +202,8 @@ function buildRandomPlan(dishes: Dish[], weekStart: Date): Plan {
 			isWeekend,
 			pranzo: pickRandom(pranzoOptions)?.id ?? null,
 			cena: pickRandom(cenaOptions)?.id ?? null,
+			pranzoContorno: null,
+			cenaContorno: null,
 		});
 	}
 	return { weekStart: formatDate(weekStart), days };
@@ -208,7 +219,8 @@ async function handleCreateDish(request: Request, env: Env): Promise<Response> {
 	if (!body || typeof body.name !== "string" || !body.name.trim()) {
 		return json({ error: "Il campo 'name' è obbligatorio." }, { status: 400 });
 	}
-	if (body.type !== "pranzo" && body.type !== "cena" && body.type !== "entrambi") {
+	const category: DishCategory = body.category === "contorno" ? "contorno" : "piatto";
+	if (category === "piatto" && body.type !== "pranzo" && body.type !== "cena" && body.type !== "entrambi") {
 		return json({ error: "Il campo 'type' deve essere 'pranzo', 'cena' o 'entrambi'." }, { status: 400 });
 	}
 
@@ -223,8 +235,9 @@ async function handleCreateDish(request: Request, env: Env): Promise<Response> {
 	const dish: Dish = {
 		id,
 		name: body.name.trim(),
-		type: body.type,
+		type: category === "contorno" ? "entrambi" : (body.type as DishType),
 		weekendOnly: Boolean(body.weekendOnly),
+		category,
 	};
 	dishes.push(dish);
 	await saveDishes(env, dishes);
@@ -236,7 +249,8 @@ async function handleUpdateDish(request: Request, env: Env, id: string): Promise
 	if (!body || typeof body.name !== "string" || !body.name.trim()) {
 		return json({ error: "Il campo 'name' è obbligatorio." }, { status: 400 });
 	}
-	if (body.type !== "pranzo" && body.type !== "cena" && body.type !== "entrambi") {
+	const category: DishCategory = body.category === "contorno" ? "contorno" : "piatto";
+	if (category === "piatto" && body.type !== "pranzo" && body.type !== "cena" && body.type !== "entrambi") {
 		return json({ error: "Il campo 'type' deve essere 'pranzo', 'cena' o 'entrambi'." }, { status: 400 });
 	}
 
@@ -246,7 +260,8 @@ async function handleUpdateDish(request: Request, env: Env, id: string): Promise
 		return json({ error: `Piatto '${id}' non trovato.` }, { status: 404 });
 	}
 	dish.name = body.name.trim();
-	dish.type = body.type;
+	dish.category = category;
+	dish.type = category === "contorno" ? "entrambi" : (body.type as DishType);
 	await saveDishes(env, dishes);
 	return json(dish);
 }
@@ -345,6 +360,61 @@ async function handleSwapDish(request: Request, env: Env): Promise<Response> {
 	}
 
 	day[body.slot] = dish.id;
+	await savePlan(env, ownerEmail, plan);
+	return json(plan);
+}
+
+async function handleSwapContorno(request: Request, env: Env): Promise<Response> {
+	const requesterEmail = getAuthenticatedEmail(request);
+	if (!requesterEmail) return unauthorized();
+	const body = (await request.json().catch(() => null)) as {
+		ownerEmail?: string;
+		weekStart?: string;
+		date?: string;
+		slot?: MealSlot;
+		dishId?: string | null;
+	} | null;
+	if (!body || !body.weekStart || !body.date || !body.slot) {
+		return json({ error: "Servono 'weekStart', 'date' e 'slot'." }, { status: 400 });
+	}
+	if (body.slot !== "pranzo" && body.slot !== "cena") {
+		return json({ error: "'slot' deve essere 'pranzo' o 'cena'." }, { status: 400 });
+	}
+	const ownerEmail = (body.ownerEmail || requesterEmail).toLowerCase();
+	if (!(await resolveAccess(env, requesterEmail, ownerEmail, "edit"))) {
+		return json({ error: "Non hai i permessi per modificare questo piano." }, { status: 403 });
+	}
+
+	const plan = await getPlan(env, ownerEmail, body.weekStart);
+	if (!plan) {
+		return json({ error: "Nessun piano attivo. Generane uno prima." }, { status: 404 });
+	}
+	const day = plan.days.find((d) => d.date === body.date);
+	if (!day) {
+		return json({ error: `Nessun giorno trovato per la data ${body.date}.` }, { status: 404 });
+	}
+
+	const field = body.slot === "pranzo" ? "pranzoContorno" : "cenaContorno";
+
+	if (!body.dishId) {
+		day[field] = null;
+		await savePlan(env, ownerEmail, plan);
+		return json(plan);
+	}
+
+	const dishes = await getDishes(env);
+	const dish = dishes.find((d) => d.id === body.dishId);
+	if (!dish) {
+		return json({ error: `Contorno '${body.dishId}' non trovato.` }, { status: 404 });
+	}
+	if (dish.category !== "contorno") {
+		return json({ error: `'${dish.name}' non è un contorno.` }, { status: 400 });
+	}
+	if (dish.weekendOnly && !day.isWeekend) {
+		return json({ error: `Il contorno '${dish.name}' è disponibile solo nel weekend.` }, { status: 400 });
+	}
+
+	day[field] = dish.id;
 	await savePlan(env, ownerEmail, plan);
 	return json(plan);
 }
@@ -448,6 +518,9 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
 		}
 		if (pathname === "/api/plan/swap" && method === "POST") {
 			return await handleSwapDish(request, env);
+		}
+		if (pathname === "/api/plan/swap-contorno" && method === "POST") {
+			return await handleSwapContorno(request, env);
 		}
 		if (pathname === "/api/shares" && method === "GET") {
 			return await handleGetShares(request, env);

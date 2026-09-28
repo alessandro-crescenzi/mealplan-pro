@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { EditDishModal } from "./EditDishModal";
 import { ConfirmModal } from "./ConfirmModal";
-import type { Dish, DishType } from "../lib/types";
+import type { Dish, DishCategory, DishType } from "../lib/types";
 
 const TYPE_LABELS: Record<DishType, string> = {
 	pranzo: "Pranzo",
@@ -12,8 +12,14 @@ const TYPE_LABELS: Record<DishType, string> = {
 interface RecipeListProps {
 	dishes: Dish[];
 	canDelete: boolean;
-	onUpdate: (id: string, input: { name: string; type: DishType }) => Promise<Dish>;
+	onUpdate: (id: string, input: { name: string; type: DishType; category: DishCategory }) => Promise<Dish>;
 	onDelete: (id: string) => Promise<void>;
+}
+
+interface Filters {
+	pranzo: boolean;
+	cena: boolean;
+	contorni: boolean;
 }
 
 export function RecipeList({ dishes, canDelete, onUpdate, onDelete }: RecipeListProps) {
@@ -21,6 +27,22 @@ export function RecipeList({ dishes, canDelete, onUpdate, onDelete }: RecipeList
 	const [deletingDish, setDeletingDish] = useState<Dish | null>(null);
 	const [deleting, setDeleting] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
+	const [filters, setFilters] = useState<Filters>({ pranzo: true, cena: true, contorni: true });
+
+	const visibleDishes = useMemo(
+		() =>
+			dishes.filter((dish) => {
+				if (dish.category === "contorno") return filters.contorni;
+				if (dish.type === "entrambi") return filters.pranzo || filters.cena;
+				if (dish.type === "pranzo") return filters.pranzo;
+				return filters.cena;
+			}),
+		[dishes, filters],
+	);
+
+	function toggleFilter(key: keyof Filters) {
+		setFilters((prev) => ({ ...prev, [key]: !prev[key] }));
+	}
 
 	async function handleConfirmDelete() {
 		if (!deletingDish) return;
@@ -42,11 +64,30 @@ export function RecipeList({ dishes, canDelete, onUpdate, onDelete }: RecipeList
 
 	return (
 		<div className="recipe-list">
-			{dishes.map((dish) => (
+			<div className="recipe-list__filters">
+				<label className="recipe-list__filter">
+					<input type="checkbox" checked={filters.pranzo} onChange={() => toggleFilter("pranzo")} />
+					<span>Pranzo</span>
+				</label>
+				<label className="recipe-list__filter">
+					<input type="checkbox" checked={filters.cena} onChange={() => toggleFilter("cena")} />
+					<span>Cena</span>
+				</label>
+				<label className="recipe-list__filter">
+					<input type="checkbox" checked={filters.contorni} onChange={() => toggleFilter("contorni")} />
+					<span>Contorni</span>
+				</label>
+			</div>
+
+			{visibleDishes.length === 0 && <p className="app__status">Nessuna ricetta per i filtri selezionati.</p>}
+
+			{visibleDishes.map((dish) => (
 				<div key={dish.id} className="recipe-list__row">
 					<div className="recipe-list__info">
 						<span className="recipe-list__name">{dish.name}</span>
-						<span className="recipe-list__badge">{TYPE_LABELS[dish.type]}</span>
+						<span className="recipe-list__badge">
+							{dish.category === "contorno" ? "Contorno" : TYPE_LABELS[dish.type]}
+						</span>
 						{dish.weekendOnly && (
 							<span className="recipe-list__badge recipe-list__badge--weekend">Weekend</span>
 						)}

@@ -152,6 +152,164 @@ describe("mealplan pages function API", () => {
 		expect((await nextWeekRes.json()) as { weekStart: string }).toMatchObject({ weekStart: "2026-10-05" });
 	});
 
+	it("POST /api/dishes with category 'contorno' ignores 'type' and stores 'entrambi'", async () => {
+		const env = makeEnv();
+		const res = await handleRequest(
+			new Request("http://example.com/api/dishes", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ name: "Insalata mista", category: "contorno" }),
+			}),
+			env,
+		);
+		expect(res.status).toBe(201);
+		const dish = (await res.json()) as { category: string; type: string };
+		expect(dish.category).toBe("contorno");
+		expect(dish.type).toBe("entrambi");
+	});
+
+	it("POST /api/plan/generate never assigns a contorno automatically", async () => {
+		const env = makeEnv();
+		await env.MEALPLAN_KV.put(
+			"dishes",
+			JSON.stringify([
+				{ id: "dish", name: "Dish", type: "entrambi", weekendOnly: false, category: "piatto" },
+				{ id: "insalata", name: "Insalata", type: "entrambi", weekendOnly: false, category: "contorno" },
+			]),
+		);
+		const res = await handleRequest(
+			new Request("http://example.com/api/plan/generate", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "owner@example.com",
+				},
+				body: JSON.stringify({ weekStart: "2026-09-28" }),
+			}),
+			env,
+		);
+		const plan = (await res.json()) as { days: { pranzoContorno: string | null; cenaContorno: string | null }[] };
+		for (const day of plan.days) {
+			expect(day.pranzoContorno).toBeNull();
+			expect(day.cenaContorno).toBeNull();
+		}
+	});
+
+	it("POST /api/plan/swap-contorno assigns a contorno to a slot", async () => {
+		const env = makeEnv();
+		await env.MEALPLAN_KV.put(
+			"dishes",
+			JSON.stringify([{ id: "insalata", name: "Insalata", type: "entrambi", weekendOnly: false, category: "contorno" }]),
+		);
+		await env.MEALPLAN_KV.put(
+			"plan:owner@example.com:2026-09-28",
+			JSON.stringify({
+				weekStart: "2026-09-28",
+				days: [
+					{
+						date: "2026-09-28",
+						dayName: "Lunedì",
+						isWeekend: false,
+						pranzo: null,
+						cena: null,
+						pranzoContorno: null,
+						cenaContorno: null,
+					},
+				],
+			}),
+		);
+		const res = await handleRequest(
+			new Request("http://example.com/api/plan/swap-contorno", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "owner@example.com",
+				},
+				body: JSON.stringify({ weekStart: "2026-09-28", date: "2026-09-28", slot: "pranzo", dishId: "insalata" }),
+			}),
+			env,
+		);
+		expect(res.status).toBe(200);
+		const plan = (await res.json()) as { days: { pranzoContorno: string | null }[] };
+		expect(plan.days[0].pranzoContorno).toBe("insalata");
+	});
+
+	it("POST /api/plan/swap-contorno rejects a dish that isn't a contorno", async () => {
+		const env = makeEnv();
+		await env.MEALPLAN_KV.put(
+			"dishes",
+			JSON.stringify([{ id: "dish", name: "Dish", type: "entrambi", weekendOnly: false, category: "piatto" }]),
+		);
+		await env.MEALPLAN_KV.put(
+			"plan:owner@example.com:2026-09-28",
+			JSON.stringify({
+				weekStart: "2026-09-28",
+				days: [
+					{
+						date: "2026-09-28",
+						dayName: "Lunedì",
+						isWeekend: false,
+						pranzo: null,
+						cena: null,
+						pranzoContorno: null,
+						cenaContorno: null,
+					},
+				],
+			}),
+		);
+		const res = await handleRequest(
+			new Request("http://example.com/api/plan/swap-contorno", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "owner@example.com",
+				},
+				body: JSON.stringify({ weekStart: "2026-09-28", date: "2026-09-28", slot: "pranzo", dishId: "dish" }),
+			}),
+			env,
+		);
+		expect(res.status).toBe(400);
+	});
+
+	it("POST /api/plan/swap-contorno with a null dishId clears the slot", async () => {
+		const env = makeEnv();
+		await env.MEALPLAN_KV.put(
+			"dishes",
+			JSON.stringify([{ id: "insalata", name: "Insalata", type: "entrambi", weekendOnly: false, category: "contorno" }]),
+		);
+		await env.MEALPLAN_KV.put(
+			"plan:owner@example.com:2026-09-28",
+			JSON.stringify({
+				weekStart: "2026-09-28",
+				days: [
+					{
+						date: "2026-09-28",
+						dayName: "Lunedì",
+						isWeekend: false,
+						pranzo: null,
+						cena: null,
+						pranzoContorno: "insalata",
+						cenaContorno: null,
+					},
+				],
+			}),
+		);
+		const res = await handleRequest(
+			new Request("http://example.com/api/plan/swap-contorno", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Cf-Access-Authenticated-User-Email": "owner@example.com",
+				},
+				body: JSON.stringify({ weekStart: "2026-09-28", date: "2026-09-28", slot: "pranzo", dishId: null }),
+			}),
+			env,
+		);
+		expect(res.status).toBe(200);
+		const plan = (await res.json()) as { days: { pranzoContorno: string | null }[] };
+		expect(plan.days[0].pranzoContorno).toBeNull();
+	});
+
 	it("responds 404 for unknown routes", async () => {
 		const env = makeEnv();
 		const res = await handleRequest(new Request("http://example.com/nope"), env);
