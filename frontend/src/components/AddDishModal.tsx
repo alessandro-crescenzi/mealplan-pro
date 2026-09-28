@@ -1,15 +1,16 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Modal } from "./Modal";
-import type { Dish, DishType } from "../lib/types";
+import type { Dish, DishCategory, DishType } from "../lib/types";
 
 interface AddDishModalProps {
 	onClose: () => void;
-	onAdd: (input: { name: string; type: DishType; weekendOnly: boolean }) => Promise<Dish>;
+	onAdd: (input: { name: string; type: DishType; weekendOnly: boolean; category: DishCategory }) => Promise<Dish>;
 }
 
 export function AddDishModal({ onClose, onAdd }: AddDishModalProps) {
 	const [name, setName] = useState("");
+	const [category, setCategory] = useState<DishCategory>("piatto");
 	const [type, setType] = useState<DishType>("pranzo");
 	const [weekendOnly, setWeekendOnly] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
@@ -18,13 +19,13 @@ export function AddDishModal({ onClose, onAdd }: AddDishModalProps) {
 	async function handleSubmit(e: FormEvent) {
 		e.preventDefault();
 		if (!name.trim()) {
-			setError("Il nome del piatto è obbligatorio.");
+			setError("Il nome è obbligatorio.");
 			return;
 		}
 		setSubmitting(true);
 		setError(null);
 		try {
-			await onAdd({ name: name.trim(), type, weekendOnly });
+			await onAdd({ name: name.trim(), type, weekendOnly, category });
 			onClose();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Errore imprevisto.");
@@ -34,27 +35,37 @@ export function AddDishModal({ onClose, onAdd }: AddDishModalProps) {
 	}
 
 	return (
-		<Modal title="Aggiungi piatto" onClose={onClose}>
+		<Modal title="Aggiungi ricetta" onClose={onClose}>
 			<form className="dish-form" onSubmit={handleSubmit}>
 				<label className="dish-form__field">
-					<span>Nome del piatto</span>
+					<span>Categoria</span>
+					<select value={category} onChange={(e) => setCategory(e.target.value as DishCategory)}>
+						<option value="piatto">Piatto</option>
+						<option value="contorno">Contorno</option>
+					</select>
+				</label>
+
+				<label className="dish-form__field">
+					<span>Nome</span>
 					<input
 						type="text"
 						value={name}
 						onChange={(e) => setName(e.target.value)}
-						placeholder="Es. Pasta alla norma"
+						placeholder={category === "contorno" ? "Es. Insalata mista" : "Es. Pasta alla norma"}
 						autoFocus
 					/>
 				</label>
 
-				<label className="dish-form__field">
-					<span>Tipo</span>
-					<select value={type} onChange={(e) => setType(e.target.value as DishType)}>
-						<option value="pranzo">Pranzo</option>
-						<option value="cena">Cena</option>
-						<option value="entrambi">Entrambi</option>
-					</select>
-				</label>
+				{category === "piatto" && (
+					<label className="dish-form__field">
+						<span>Tipo</span>
+						<select value={type} onChange={(e) => setType(e.target.value as DishType)}>
+							<option value="pranzo">Pranzo</option>
+							<option value="cena">Cena</option>
+							<option value="entrambi">Entrambi</option>
+						</select>
+					</label>
+				)}
 
 				<label className="dish-form__checkbox">
 					<input

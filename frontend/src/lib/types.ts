@@ -1,4 +1,5 @@
 export type DishType = "pranzo" | "cena" | "entrambi";
+export type DishCategory = "piatto" | "contorno";
 export type MealSlot = "pranzo" | "cena";
 
 export interface Dish {
@@ -6,6 +7,7 @@ export interface Dish {
 	name: string;
 	type: DishType;
 	weekendOnly: boolean;
+	category: DishCategory;
 }
 
 export interface PlanDay {
@@ -14,6 +16,8 @@ export interface PlanDay {
 	isWeekend: boolean;
 	pranzo: string | null;
 	cena: string | null;
+	pranzoContorno: string | null;
+	cenaContorno: string | null;
 }
 
 export interface Plan {

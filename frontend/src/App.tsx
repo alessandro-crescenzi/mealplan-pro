@@ -18,11 +18,12 @@ import {
 	getShares,
 	getSharedWithMe,
 	removeShare,
+	swapContorno,
 	swapDish,
 	updateDish,
 } from "./lib/api";
 import { addDays, mondayOf } from "./lib/week";
-import type { Dish, DishType, IncomingShare, MealSlot, Permission, Plan, ShareEntry } from "./lib/types";
+import type { Dish, DishCategory, DishType, IncomingShare, MealSlot, Permission, Plan, ShareEntry } from "./lib/types";
 
 function weekRangeLabel(weekStart: string): string {
 	const start = new Date(`${weekStart}T00:00:00`);
@@ -100,7 +101,12 @@ function App() {
 		[dishes],
 	);
 
-	async function handleAddDish(input: { name: string; type: DishType; weekendOnly: boolean }): Promise<Dish> {
+	async function handleAddDish(input: {
+		name: string;
+		type: DishType;
+		weekendOnly: boolean;
+		category: DishCategory;
+	}): Promise<Dish> {
 		const dish = await addDish(input);
 		setDishes((prev) => [...prev, dish]);
 		return dish;
@@ -137,6 +143,22 @@ function App() {
 		}
 	}
 
+	async function handleContornoChange(date: string, slot: MealSlot, dishId: string | null) {
+		setSwapError(null);
+		try {
+			const newPlan = await swapContorno({
+				weekStart: viewedWeekStart,
+				date,
+				slot,
+				dishId,
+				ownerEmail: viewedOwnerEmail ?? undefined,
+			});
+			setPlan(newPlan);
+		} catch (err) {
+			setSwapError(err instanceof Error ? err.message : "Errore imprevisto.");
+		}
+	}
+
 	async function handleAddShare(granteeEmail: string, permission: Permission): Promise<void> {
 		const updated = await addShare({ granteeEmail, permission });
 		setShares(updated);
@@ -147,7 +169,10 @@ function App() {
 		setShares((prev) => prev.filter((s) => s.granteeEmail !== granteeEmail));
 	}
 
-	async function handleUpdateDish(id: string, input: { name: string; type: DishType }): Promise<Dish> {
+	async function handleUpdateDish(
+		id: string,
+		input: { name: string; type: DishType; category: DishCategory },
+	): Promise<Dish> {
 		const updated = await updateDish(id, input);
 		setDishes((prev) => prev.map((d) => (d.id === id ? updated : d)));
 		return updated;
@@ -212,7 +237,7 @@ function App() {
 						{view === "plan" && (
 							<>
 								<button type="button" className="btn btn--ghost" onClick={() => setAddModalOpen(true)}>
-									Aggiungi piatto
+									Aggiungi ricetta
 								</button>
 								{isOwnPlan && (
 									<button type="button" className="btn btn--ghost" onClick={() => setShareModalOpen(true)}>
@@ -251,6 +276,7 @@ function App() {
 						dishes={dishes}
 						dishesById={dishesById}
 						onSwap={handleSwap}
+						onContornoChange={handleContornoChange}
 						readOnly={!canEditViewedPlan}
 					/>
 				)}

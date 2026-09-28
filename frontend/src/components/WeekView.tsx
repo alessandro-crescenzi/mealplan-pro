@@ -6,10 +6,11 @@ interface WeekViewProps {
 	dishes: Dish[];
 	dishesById: Record<string, Dish>;
 	onSwap: (date: string, slot: MealSlot, dishId: string) => void;
+	onContornoChange: (date: string, slot: MealSlot, dishId: string | null) => void;
 	readOnly?: boolean;
 }
 
-export function WeekView({ plan, dishes, dishesById, onSwap, readOnly }: WeekViewProps) {
+export function WeekView({ plan, dishes, dishesById, onSwap, onContornoChange, readOnly }: WeekViewProps) {
 	return (
 		<div className="week-grid">
 			{plan.days.map((day) => (
@@ -19,6 +20,7 @@ export function WeekView({ plan, dishes, dishesById, onSwap, readOnly }: WeekVie
 					dishes={dishes}
 					dishesById={dishesById}
 					onSwap={onSwap}
+					onContornoChange={onContornoChange}
 					readOnly={readOnly}
 				/>
 			))}

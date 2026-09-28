@@ -1,4 +1,4 @@
-import type { Dish, DishType, IncomingShare, MealSlot, Permission, Plan, ShareEntry } from "./types";
+import type { Dish, DishCategory, DishType, IncomingShare, MealSlot, Permission, Plan, ShareEntry } from "./types";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
 	const res = await fetch(path, {
@@ -29,7 +29,12 @@ export function generatePlan(weekStart: string, ownerEmail?: string): Promise<Pl
 	});
 }
 
-export function addDish(input: { name: string; type: DishType; weekendOnly?: boolean }): Promise<Dish> {
+export function addDish(input: {
+	name: string;
+	type: DishType;
+	weekendOnly?: boolean;
+	category: DishCategory;
+}): Promise<Dish> {
 	return request<Dish>("/api/dishes", {
 		method: "POST",
 		body: JSON.stringify(input),
@@ -49,7 +54,23 @@ export function swapDish(input: {
 	});
 }
 
-export function updateDish(id: string, input: { name: string; type: DishType }): Promise<Dish> {
+export function swapContorno(input: {
+	weekStart: string;
+	date: string;
+	slot: MealSlot;
+	dishId: string | null;
+	ownerEmail?: string;
+}): Promise<Plan> {
+	return request<Plan>("/api/plan/swap-contorno", {
+		method: "POST",
+		body: JSON.stringify(input),
+	});
+}
+
+export function updateDish(
+	id: string,
+	input: { name: string; type: DishType; category: DishCategory },
+): Promise<Dish> {
 	return request<Dish>(`/api/dishes/${encodeURIComponent(id)}`, {
 		method: "PUT",
 		body: JSON.stringify(input),
