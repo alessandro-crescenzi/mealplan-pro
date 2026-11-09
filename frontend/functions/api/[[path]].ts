@@ -1,12 +1,14 @@
 interface KVNamespace {
 	get(key: string): Promise<string | null>;
-	put(key: string, value: string): Promise<void>;
+	put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
 	delete(key: string): Promise<void>;
 }
 
 export interface Env {
 	MEALPLAN_KV: KVNamespace;
 	ADMIN_EMAIL?: string;
+	// Local development only: stands in for the Cloudflare Access header on localhost.
+	DEV_USER_EMAIL?: string;
 }
 
 interface EventContext<E> {
@@ -23,6 +25,7 @@ interface Dish {
 	type: DishType;
 	weekendOnly: boolean;
 	category: DishCategory;
+	ingredients?: string[];
 }
 
 type MealSlot = "pranzo" | "cena";
@@ -54,6 +57,27 @@ interface IncomingShare {
 }
 
 const DISHES_KEY = "dishes";
+
+// Shared shopping lists are read by Bring!'s servers, which can't authenticate, so they live
+// behind an unguessable token and expire on their own.
+const SHOPPING_LIST_TTL_SECONDS = 3 * 24 * 60 * 60;
+const SHOPPING_LIST_MAX_ITEMS = 200;
+const SHOPPING_LIST_MAX_NAME_LENGTH = 100;
+const DEFAULT_SHOPPING_LIST_TITLE = "Lista della spesa";
+
+interface ShoppingListItem {
+	name: string;
+	count: number;
+}
+
+interface SharedShoppingList {
+	title: string;
+	items: ShoppingListItem[];
+}
+
+function shoppingListKey(token: string): string {
+	return `shopping-list:${token}`;
+}
 
 function planKey(ownerEmail: string, weekStart: string): string {
 	return `plan:${ownerEmail}:${weekStart}`;
@@ -89,6 +113,24 @@ function slugify(name: string): string {
 		.replace(/(^-|-$)/g, "");
 }
 
+// Returns undefined when the field is absent, null when it is present but invalid.
+function parseIngredients(raw: unknown): string[] | undefined | null {
+	if (raw === undefined) return undefined;
+	if (!Array.isArray(raw) || !raw.every((i) => typeof i === "string")) return null;
+	const seen = new Set<string>();
+	const result: string[] = [];
+	for (const item of raw as string[]) {
+		const name = item.trim();
+		const key = name.toLowerCase();
+		if (!name || seen.has(key)) continue;
+		seen.add(key);
+		result.push(name);
+	}
+	return result;
+}
+
+const INVALID_INGREDIENTS = "Il campo 'ingredients' deve essere un elenco di testi.";
+
 async function getDishes(env: Env): Promise<Dish[]> {
 	const raw = await env.MEALPLAN_KV.get(DISHES_KEY);
 	return raw ? JSON.parse(raw) : [];
@@ -98,8 +140,21 @@ async function saveDishes(env: Env, dishes: Dish[]): Promise<void> {
 	await env.MEALPLAN_KV.put(DISHES_KEY, JSON.stringify(dishes));
 }
 
+const ACCESS_EMAIL_HEADER = "Cf-Access-Authenticated-User-Email";
+const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
+
+// Cloudflare Access is not in front of `wrangler pages dev`, so locally there is no identity header.
+// The fallback is restricted to local hostnames so a stray DEV_USER_EMAIL in production does nothing.
+function withDevIdentity(request: Request, env: Env): Request {
+	if (!env.DEV_USER_EMAIL || request.headers.get(ACCESS_EMAIL_HEADER)) return request;
+	if (!LOCAL_HOSTNAMES.has(new URL(request.url).hostname)) return request;
+	const headers = new Headers(request.headers);
+	headers.set(ACCESS_EMAIL_HEADER, env.DEV_USER_EMAIL);
+	return new Request(request, { headers });
+}
+
 function getAuthenticatedEmail(request: Request): string | null {
-	const email = request.headers.get("Cf-Access-Authenticated-User-Email");
+	const email = request.headers.get(ACCESS_EMAIL_HEADER);
 	return email ? email.toLowerCase() : null;
 }
 
@@ -224,6 +279,11 @@ async function handleCreateDish(request: Request, env: Env): Promise<Response> {
 		return json({ error: "Il campo 'type' deve essere 'pranzo', 'cena' o 'entrambi'." }, { status: 400 });
 	}
 
+	const ingredients = parseIngredients(body.ingredients);
+	if (ingredients === null) {
+		return json({ error: INVALID_INGREDIENTS }, { status: 400 });
+	}
+
 	const dishes = await getDishes(env);
 	const baseId = slugify(body.name);
 	let id = baseId;
@@ -238,6 +298,7 @@ async function handleCreateDish(request: Request, env: Env): Promise<Response> {
 		type: category === "contorno" ? "entrambi" : (body.type as DishType),
 		weekendOnly: Boolean(body.weekendOnly),
 		category,
+		ingredients: ingredients ?? [],
 	};
 	dishes.push(dish);
 	await saveDishes(env, dishes);
@@ -254,11 +315,17 @@ async function handleUpdateDish(request: Request, env: Env, id: string): Promise
 		return json({ error: "Il campo 'type' deve essere 'pranzo', 'cena' o 'entrambi'." }, { status: 400 });
 	}
 
+	const ingredients = parseIngredients(body.ingredients);
+	if (ingredients === null) {
+		return json({ error: INVALID_INGREDIENTS }, { status: 400 });
+	}
+
 	const dishes = await getDishes(env);
 	const dish = dishes.find((d) => d.id === id);
 	if (!dish) {
 		return json({ error: `Piatto '${id}' non trovato.` }, { status: 404 });
 	}
+	if (ingredients !== undefined) dish.ingredients = ingredients;
 	dish.name = body.name.trim();
 	dish.category = category;
 	dish.type = category === "contorno" ? "entrambi" : (body.type as DishType);
@@ -419,6 +486,101 @@ async function handleSwapContorno(request: Request, env: Env): Promise<Response>
 	return json(plan);
 }
 
+function parseShoppingList(body: unknown): SharedShoppingList | null {
+	if (!body || typeof body !== "object") return null;
+	const { title, items } = body as { title?: unknown; items?: unknown };
+	if (!Array.isArray(items) || items.length === 0 || items.length > SHOPPING_LIST_MAX_ITEMS) return null;
+	const parsed: ShoppingListItem[] = [];
+	for (const item of items) {
+		if (!item || typeof item !== "object") return null;
+		const { name, count } = item as { name?: unknown; count?: unknown };
+		if (typeof name !== "string" || typeof count !== "number") return null;
+		const trimmed = name.trim();
+		if (!trimmed || trimmed.length > SHOPPING_LIST_MAX_NAME_LENGTH) return null;
+		if (!Number.isInteger(count) || count < 1 || count > 99) return null;
+		parsed.push({ name: trimmed, count });
+	}
+	const cleanTitle =
+		typeof title === "string" && title.trim() ? title.trim().slice(0, SHOPPING_LIST_MAX_NAME_LENGTH) : null;
+	return { title: cleanTitle ?? DEFAULT_SHOPPING_LIST_TITLE, items: parsed };
+}
+
+function escapeHtml(text: string): string {
+	return text
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;");
+}
+
+// Bring! parses the schema.org Recipe markup; "2 zucchine" is read as quantity + item.
+function ingredientLine(item: ShoppingListItem): string {
+	return item.count > 1 ? `${item.count} ${item.name}` : item.name;
+}
+
+function renderShoppingListPage(list: SharedShoppingList): string {
+	const lines = list.items.map(ingredientLine);
+	const recipe = {
+		"@context": "https://schema.org",
+		"@type": "Recipe",
+		name: list.title,
+		recipeYield: "1",
+		recipeIngredient: lines,
+	};
+	// "<" is escaped so user text can never close the script block.
+	const jsonLd = JSON.stringify(recipe).replace(/</g, "\\u003c");
+	const title = escapeHtml(list.title);
+	return `<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<title>${title}</title>
+<script type="application/ld+json">${jsonLd}</script>
+</head>
+<body>
+<h1>${title}</h1>
+<ul>
+${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join("\n")}
+</ul>
+</body>
+</html>
+`;
+}
+
+async function handleShareShoppingList(request: Request, env: Env): Promise<Response> {
+	const requesterEmail = getAuthenticatedEmail(request);
+	if (!requesterEmail) return unauthorized();
+	const list = parseShoppingList(await request.json().catch(() => null));
+	if (!list) {
+		return json(
+			{
+				error: `Servono 'items' (da 1 a ${SHOPPING_LIST_MAX_ITEMS} voci con 'name' e 'count' interi da 1 a 99).`,
+			},
+			{ status: 400 },
+		);
+	}
+	const token = crypto.randomUUID();
+	await env.MEALPLAN_KV.put(shoppingListKey(token), JSON.stringify(list), {
+		expirationTtl: SHOPPING_LIST_TTL_SECONDS,
+	});
+	const origin = new URL(request.url).origin;
+	return json({ url: `${origin}/api/public/shopping-list/${token}` }, { status: 201 });
+}
+
+async function handleGetPublicShoppingList(env: Env, token: string): Promise<Response> {
+	const raw = await env.MEALPLAN_KV.get(shoppingListKey(token));
+	if (!raw) return json({ error: "Lista non trovata o scaduta." }, { status: 404 });
+	return new Response(renderShoppingListPage(JSON.parse(raw) as SharedShoppingList), {
+		headers: {
+			"Content-Type": "text/html; charset=utf-8",
+			"Cache-Control": "no-store",
+			"X-Robots-Tag": "noindex, nofollow",
+		},
+	});
+}
+
 async function handleGetShares(request: Request, env: Env): Promise<Response> {
 	const requesterEmail = getAuthenticatedEmail(request);
 	if (!requesterEmail) return unauthorized();
@@ -488,7 +650,8 @@ async function handleGetSharedWithMe(request: Request, env: Env): Promise<Respon
 	return json(incoming);
 }
 
-export async function handleRequest(request: Request, env: Env): Promise<Response> {
+export async function handleRequest(incoming: Request, env: Env): Promise<Response> {
+	const request = withDevIdentity(incoming, env);
 	const url = new URL(request.url);
 	const { pathname } = url;
 	const method = request.method;
@@ -521,6 +684,13 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
 		}
 		if (pathname === "/api/plan/swap-contorno" && method === "POST") {
 			return await handleSwapContorno(request, env);
+		}
+		if (pathname === "/api/shopping-list/share" && method === "POST") {
+			return await handleShareShoppingList(request, env);
+		}
+		const publicListMatch = pathname.match(/^\/api\/public\/shopping-list\/([^/]+)$/);
+		if (publicListMatch && method === "GET") {
+			return await handleGetPublicShoppingList(env, decodeURIComponent(publicListMatch[1]));
 		}
 		if (pathname === "/api/shares" && method === "GET") {
 			return await handleGetShares(request, env);

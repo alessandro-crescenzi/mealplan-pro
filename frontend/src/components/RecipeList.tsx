@@ -12,7 +12,10 @@ const TYPE_LABELS: Record<DishType, string> = {
 interface RecipeListProps {
 	dishes: Dish[];
 	canDelete: boolean;
-	onUpdate: (id: string, input: { name: string; type: DishType; category: DishCategory }) => Promise<Dish>;
+	onUpdate: (
+		id: string,
+		input: { name: string; type: DishType; category: DishCategory; ingredients: string[] },
+	) => Promise<Dish>;
 	onDelete: (id: string) => Promise<void>;
 }
 
@@ -83,14 +86,21 @@ export function RecipeList({ dishes, canDelete, onUpdate, onDelete }: RecipeList
 
 			{visibleDishes.map((dish) => (
 				<div key={dish.id} className="recipe-list__row">
-					<div className="recipe-list__info">
-						<span className="recipe-list__name">{dish.name}</span>
-						<span className="recipe-list__badge">
-							{dish.category === "contorno" ? "Contorno" : TYPE_LABELS[dish.type]}
-						</span>
-						{dish.weekendOnly && (
-							<span className="recipe-list__badge recipe-list__badge--weekend">Weekend</span>
-						)}
+					<div className="recipe-list__details">
+						<div className="recipe-list__info">
+							<span className="recipe-list__name">{dish.name}</span>
+							<span className="recipe-list__badge">
+								{dish.category === "contorno" ? "Contorno" : TYPE_LABELS[dish.type]}
+							</span>
+							{dish.weekendOnly && (
+								<span className="recipe-list__badge recipe-list__badge--weekend">Weekend</span>
+							)}
+						</div>
+						<p className="recipe-list__ingredients">
+							{dish.ingredients && dish.ingredients.length > 0
+								? dish.ingredients.join(", ")
+								: "Nessun ingrediente"}
+						</p>
 					</div>
 					<div className="recipe-list__actions">
 						<button type="button" className="btn btn--ghost" onClick={() => setEditingDish(dish)}>

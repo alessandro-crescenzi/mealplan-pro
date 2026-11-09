@@ -390,3 +390,43 @@
 		grid-template-columns: 1fr;
 	}
 }
+
+.recipe-list__details {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.recipe-list__ingredients {
+	margin: 0;
+	font-size: 13px;
+	color: var(--text);
+}
+
+.shopping-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	list-style: none;
+	padding: 0;
+	margin: 0 0 16px;
+	max-height: 50vh;
+	overflow-y: auto;
+}
+
+.shopping-list__item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	padding: 10px 16px;
+	color: var(--text-h);
+}
+
+.shopping-list__count {
+	font-weight: 700;
+	color: var(--accent);
+}

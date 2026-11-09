@@ -1,11 +1,18 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Modal } from "./Modal";
+import { parseIngredientsInput } from "../lib/shoppingList";
 import type { Dish, DishCategory, DishType } from "../lib/types";
 
 interface AddDishModalProps {
 	onClose: () => void;
-	onAdd: (input: { name: string; type: DishType; weekendOnly: boolean; category: DishCategory }) => Promise<Dish>;
+	onAdd: (input: {
+		name: string;
+		type: DishType;
+		weekendOnly: boolean;
+		category: DishCategory;
+		ingredients: string[];
+	}) => Promise<Dish>;
 }
 
 export function AddDishModal({ onClose, onAdd }: AddDishModalProps) {
@@ -13,6 +20,7 @@ export function AddDishModal({ onClose, onAdd }: AddDishModalProps) {
 	const [category, setCategory] = useState<DishCategory>("piatto");
 	const [type, setType] = useState<DishType>("pranzo");
 	const [weekendOnly, setWeekendOnly] = useState(false);
+	const [ingredients, setIngredients] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -25,7 +33,13 @@ export function AddDishModal({ onClose, onAdd }: AddDishModalProps) {
 		setSubmitting(true);
 		setError(null);
 		try {
-			await onAdd({ name: name.trim(), type, weekendOnly, category });
+			await onAdd({
+				name: name.trim(),
+				type,
+				weekendOnly,
+				category,
+				ingredients: parseIngredientsInput(ingredients),
+			});
 			onClose();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Errore imprevisto.");
@@ -66,6 +80,16 @@ export function AddDishModal({ onClose, onAdd }: AddDishModalProps) {
 						</select>
 					</label>
 				)}
+
+				<label className="dish-form__field">
+					<span>Ingredienti (separati da virgola)</span>
+					<input
+						type="text"
+						value={ingredients}
+						onChange={(e) => setIngredients(e.target.value)}
+						placeholder="Es. pasta, zucchine, pancetta"
+					/>
+				</label>
 
 				<label className="dish-form__checkbox">
 					<input

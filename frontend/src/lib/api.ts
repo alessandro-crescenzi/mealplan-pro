@@ -1,3 +1,4 @@
+import type { ShoppingItem } from "./shoppingList";
 import type { Dish, DishCategory, DishType, IncomingShare, MealSlot, Permission, Plan, ShareEntry } from "./types";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -34,6 +35,7 @@ export function addDish(input: {
 	type: DishType;
 	weekendOnly?: boolean;
 	category: DishCategory;
+	ingredients?: string[];
 }): Promise<Dish> {
 	return request<Dish>("/api/dishes", {
 		method: "POST",
@@ -69,7 +71,7 @@ export function swapContorno(input: {
 
 export function updateDish(
 	id: string,
-	input: { name: string; type: DishType; category: DishCategory },
+	input: { name: string; type: DishType; category: DishCategory; ingredients?: string[] },
 ): Promise<Dish> {
 	return request<Dish>(`/api/dishes/${encodeURIComponent(id)}`, {
 		method: "PUT",
@@ -106,4 +108,11 @@ export function removeShare(granteeEmail: string): Promise<void> {
 
 export function getSharedWithMe(): Promise<IncomingShare[]> {
 	return request<IncomingShare[]>("/api/shared-with-me");
+}
+
+export function shareShoppingList(input: { title: string; items: ShoppingItem[] }): Promise<{ url: string }> {
+	return request<{ url: string }>("/api/shopping-list/share", {
+		method: "POST",
+		body: JSON.stringify(input),
+	});
 }

@@ -8,6 +8,8 @@ export interface Dish {
 	type: DishType;
 	weekendOnly: boolean;
 	category: DishCategory;
+	// Absent on dishes saved before the shopping-list feature.
+	ingredients?: string[];
 }
 
 export interface PlanDay {
