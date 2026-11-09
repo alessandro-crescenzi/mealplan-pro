@@ -1,18 +1,23 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Modal } from "./Modal";
+import { ingredientsToInput, parseIngredientsInput } from "../lib/shoppingList";
 import type { Dish, DishCategory, DishType } from "../lib/types";
 
 interface EditDishModalProps {
 	dish: Dish;
 	onClose: () => void;
-	onSave: (id: string, input: { name: string; type: DishType; category: DishCategory }) => Promise<Dish>;
+	onSave: (
+		id: string,
+		input: { name: string; type: DishType; category: DishCategory; ingredients: string[] },
+	) => Promise<Dish>;
 }
 
 export function EditDishModal({ dish, onClose, onSave }: EditDishModalProps) {
 	const [name, setName] = useState(dish.name);
 	const [category, setCategory] = useState<DishCategory>(dish.category);
 	const [type, setType] = useState<DishType>(dish.type);
+	const [ingredients, setIngredients] = useState(ingredientsToInput(dish.ingredients));
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -25,7 +30,12 @@ export function EditDishModal({ dish, onClose, onSave }: EditDishModalProps) {
 		setSubmitting(true);
 		setError(null);
 		try {
-			await onSave(dish.id, { name: name.trim(), type, category });
+			await onSave(dish.id, {
+				name: name.trim(),
+				type,
+				category,
+				ingredients: parseIngredientsInput(ingredients),
+			});
 			onClose();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Errore imprevisto.");
@@ -60,6 +70,16 @@ export function EditDishModal({ dish, onClose, onSave }: EditDishModalProps) {
 						</select>
 					</label>
 				)}
+
+				<label className="dish-form__field">
+					<span>Ingredienti (separati da virgola)</span>
+					<input
+						type="text"
+						value={ingredients}
+						onChange={(e) => setIngredients(e.target.value)}
+						placeholder="Es. pasta, zucchine, pancetta"
+					/>
+				</label>
 
 				{error && <p className="app__status app__status--error">{error}</p>}
 

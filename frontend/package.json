@@ -12,7 +12,9 @@
     "preview:pages": "npm run build && wrangler pages dev dist",
     "deploy": "npm run build && wrangler pages deploy dist",
     "seed:local": "wrangler kv key put --binding=MEALPLAN_KV dishes --path=../data/dishes.seed.json --local",
-    "seed:remote": "wrangler kv key put --binding=MEALPLAN_KV dishes --path=../data/dishes.seed.json --remote"
+    "seed:remote": "wrangler kv key put --binding=MEALPLAN_KV dishes --path=../data/dishes.seed.json --remote",
+    "merge-ingredients:local": "node scripts/merge-ingredients.mjs --local",
+    "merge-ingredients:remote": "node scripts/merge-ingredients.mjs --remote"
   },
   "dependencies": {
     "react": "^19.2.8",

@@ -6,6 +6,7 @@ import { ConfirmModal } from "./components/ConfirmModal";
 import { RecipeList } from "./components/RecipeList";
 import { OwnerSwitcher } from "./components/OwnerSwitcher";
 import { ShareModal } from "./components/ShareModal";
+import { ShoppingListModal } from "./components/ShoppingListModal";
 import { UserBadge } from "./components/UserBadge";
 import {
 	addDish,
@@ -46,6 +47,7 @@ function App() {
 	const [isAddModalOpen, setAddModalOpen] = useState(false);
 	const [isRegenerateModalOpen, setRegenerateModalOpen] = useState(false);
 	const [isShareModalOpen, setShareModalOpen] = useState(false);
+	const [isShoppingListOpen, setShoppingListOpen] = useState(false);
 	const [regenerating, setRegenerating] = useState(false);
 	const [regenerateError, setRegenerateError] = useState<string | null>(null);
 	const [swapError, setSwapError] = useState<string | null>(null);
@@ -106,6 +108,7 @@ function App() {
 		type: DishType;
 		weekendOnly: boolean;
 		category: DishCategory;
+		ingredients: string[];
 	}): Promise<Dish> {
 		const dish = await addDish(input);
 		setDishes((prev) => [...prev, dish]);
@@ -171,7 +174,7 @@ function App() {
 
 	async function handleUpdateDish(
 		id: string,
-		input: { name: string; type: DishType; category: DishCategory },
+		input: { name: string; type: DishType; category: DishCategory; ingredients: string[] },
 	): Promise<Dish> {
 		const updated = await updateDish(id, input);
 		setDishes((prev) => prev.map((d) => (d.id === id ? updated : d)));
@@ -244,6 +247,11 @@ function App() {
 										Condividi piano
 									</button>
 								)}
+								{plan && (
+									<button type="button" className="btn btn--ghost" onClick={() => setShoppingListOpen(true)}>
+										Lista della spesa
+									</button>
+								)}
 								{canEditViewedPlan && (
 									<button
 										type="button"
@@ -303,6 +311,15 @@ function App() {
 					error={regenerateError}
 					onConfirm={handleConfirmRegenerate}
 					onCancel={() => setRegenerateModalOpen(false)}
+				/>
+			)}
+
+			{isShoppingListOpen && plan && (
+				<ShoppingListModal
+					plan={plan}
+					dishesById={dishesById}
+					weekLabel={weekRangeLabel(viewedWeekStart)}
+					onClose={() => setShoppingListOpen(false)}
 				/>
 			)}
 

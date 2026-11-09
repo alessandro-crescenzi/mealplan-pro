@@ -14,8 +14,19 @@ class MemoryKV {
 	}
 }
 
-function makeEnv(adminEmail?: string): Env {
-	return { MEALPLAN_KV: new MemoryKV(), ADMIN_EMAIL: adminEmail };
+function makeEnv(adminEmail?: string, devUserEmail?: string): Env {
+	return { MEALPLAN_KV: new MemoryKV(), ADMIN_EMAIL: adminEmail, DEV_USER_EMAIL: devUserEmail };
+}
+
+function shareRequest(body: unknown, email?: string): Request {
+	return new Request("http://example.com/api/shopping-list/share", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			...(email ? { "Cf-Access-Authenticated-User-Email": email } : {}),
+		},
+		body: JSON.stringify(body),
+	});
 }
 
 describe("mealplan pages function API", () => {
@@ -310,6 +321,114 @@ describe("mealplan pages function API", () => {
 		expect(plan.days[0].pranzoContorno).toBeNull();
 	});
 
+	it("DEV_USER_EMAIL identifies the user on localhost when no Access header is sent", async () => {
+		const env = makeEnv(undefined, "Dev@Example.com");
+		for (const host of ["http://localhost:8788", "http://127.0.0.1:8788"]) {
+			const res = await handleRequest(new Request(`${host}/api/me`), env);
+			expect(await res.json()).toMatchObject({ email: "dev@example.com" });
+		}
+	});
+
+	it("DEV_USER_EMAIL is ignored on non-local hosts", async () => {
+		const env = makeEnv(undefined, "dev@example.com");
+		const res = await handleRequest(new Request("https://mealplan-pro.pages.dev/api/me"), env);
+		expect(await res.json()).toMatchObject({ email: null });
+	});
+
+	it("the Access header wins over DEV_USER_EMAIL, and POST bodies still reach the handler", async () => {
+		const env = makeEnv(undefined, "dev@example.com");
+		const me = await handleRequest(
+			new Request("http://localhost:8788/api/me", {
+				headers: { "Cf-Access-Authenticated-User-Email": "real@example.com" },
+			}),
+			env,
+		);
+		expect(await me.json()).toMatchObject({ email: "real@example.com" });
+
+		const created = await handleRequest(
+			new Request("http://localhost:8788/api/dishes", {
+				method: "POST",
+				body: JSON.stringify({ name: "Frittata", type: "cena" }),
+			}),
+			env,
+		);
+		expect(created.status).toBe(201);
+	});
+
+	it("POST /api/shopping-list/share requires authentication", async () => {
+		const env = makeEnv();
+		const res = await handleRequest(shareRequest({ items: [{ name: "pasta", count: 1 }] }), env);
+		expect(res.status).toBe(401);
+	});
+
+	it("POST /api/shopping-list/share rejects empty or malformed lists", async () => {
+		const env = makeEnv();
+		const bad = [
+			{ items: [] },
+			{ items: "pasta" },
+			{ items: [{ name: "", count: 1 }] },
+			{ items: [{ name: "pasta", count: 0 }] },
+			{ items: [{ name: "pasta", count: 1.5 }] },
+			{ items: [{ name: "x".repeat(101), count: 1 }] },
+			{ items: Array.from({ length: 201 }, (_, i) => ({ name: `ing${i}`, count: 1 })) },
+		];
+		for (const body of bad) {
+			const res = await handleRequest(shareRequest(body, "owner@example.com"), env);
+			expect(res.status).toBe(400);
+		}
+	});
+
+	it("a shared shopping list is publicly readable as a schema.org Recipe page", async () => {
+		const env = makeEnv();
+		const created = await handleRequest(
+			shareRequest(
+				{
+					title: "Lista della spesa · 9 – 15 novembre",
+					items: [
+						{ name: "pasta", count: 1 },
+						{ name: "zucchine", count: 2 },
+					],
+				},
+				"owner@example.com",
+			),
+			env,
+		);
+		expect(created.status).toBe(201);
+		const { url } = (await created.json()) as { url: string };
+		expect(url).toMatch(/^http:\/\/example\.com\/api\/public\/shopping-list\/[0-9a-f-]{36}$/);
+
+		// No Access header: this is what Bring's servers will send.
+		const page = await handleRequest(new Request(url), env);
+		expect(page.status).toBe(200);
+		expect(page.headers.get("Content-Type")).toContain("text/html");
+		const html = await page.text();
+		const ld = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+		expect(ld).not.toBeNull();
+		const recipe = JSON.parse(ld![1]) as { "@type": string; name: string; recipeIngredient: string[] };
+		expect(recipe["@type"]).toBe("Recipe");
+		expect(recipe.name).toBe("Lista della spesa · 9 – 15 novembre");
+		expect(recipe.recipeIngredient).toEqual(["pasta", "2 zucchine"]);
+	});
+
+	it("the public shopping list page escapes user-provided text", async () => {
+		const env = makeEnv();
+		const evil = '</script><img src=x onerror=alert(1)>';
+		const created = await handleRequest(
+			shareRequest({ title: evil, items: [{ name: evil, count: 1 }] }, "owner@example.com"),
+			env,
+		);
+		const { url } = (await created.json()) as { url: string };
+		const html = await (await handleRequest(new Request(url), env)).text();
+		expect(html).not.toContain("<img");
+		expect(html.match(/<\/script>/g)).toHaveLength(1); // only the one closing the JSON-LD block
+	});
+
+	it("GET /api/public/shopping-list/:token returns 404 for unknown or expired tokens", async () => {
+		const env = makeEnv();
+		const res = await handleRequest(new Request("http://example.com/api/public/shopping-list/nope"), env);
+		expect(res.status).toBe(404);
+	});
+
 	it("responds 404 for unknown routes", async () => {
 		const env = makeEnv();
 		const res = await handleRequest(new Request("http://example.com/nope"), env);
@@ -348,6 +467,74 @@ describe("mealplan pages function API", () => {
 			env,
 		);
 		expect(res.status).toBe(404);
+	});
+
+	it("POST /api/dishes stores trimmed, de-duplicated ingredients and defaults to an empty list", async () => {
+		const env = makeEnv();
+		const post = (body: unknown) =>
+			handleRequest(
+				new Request("http://example.com/api/dishes", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(body),
+				}),
+				env,
+			);
+		const withIngredients = await post({
+			name: "Frittata con le zucchine",
+			type: "cena",
+			ingredients: [" uova ", "zucchine", "Zucchine", "", "  "],
+		});
+		expect(withIngredients.status).toBe(201);
+		expect(((await withIngredients.json()) as { ingredients: string[] }).ingredients).toEqual(["uova", "zucchine"]);
+
+		const without = await post({ name: "Pasta in bianco", type: "pranzo" });
+		expect(((await without.json()) as { ingredients: string[] }).ingredients).toEqual([]);
+	});
+
+	it("POST /api/dishes rejects ingredients that are not an array of strings", async () => {
+		const env = makeEnv();
+		for (const ingredients of ["uova, zucchine", [1, 2], { a: 1 }]) {
+			const res = await handleRequest(
+				new Request("http://example.com/api/dishes", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ name: "Frittata", type: "cena", ingredients }),
+				}),
+				env,
+			);
+			expect(res.status).toBe(400);
+		}
+	});
+
+	it("PUT /api/dishes/:id updates ingredients and leaves them untouched when omitted", async () => {
+		const env = makeEnv();
+		await env.MEALPLAN_KV.put(
+			"dishes",
+			JSON.stringify([
+				{ id: "frittata", name: "Frittata", type: "cena", weekendOnly: false, ingredients: ["uova"] },
+			]),
+		);
+		const put = (body: unknown) =>
+			handleRequest(
+				new Request("http://example.com/api/dishes/frittata", {
+					method: "PUT",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(body),
+				}),
+				env,
+			);
+		const kept = await put({ name: "Frittata", type: "cena" });
+		expect(((await kept.json()) as { ingredients: string[] }).ingredients).toEqual(["uova"]);
+
+		const updated = await put({ name: "Frittata", type: "cena", ingredients: ["uova", "zucchine"] });
+		expect(((await updated.json()) as { ingredients: string[] }).ingredients).toEqual(["uova", "zucchine"]);
+
+		const cleared = await put({ name: "Frittata", type: "cena", ingredients: [] });
+		expect(((await cleared.json()) as { ingredients: string[] }).ingredients).toEqual([]);
+
+		const invalid = await put({ name: "Frittata", type: "cena", ingredients: "uova" });
+		expect(invalid.status).toBe(400);
 	});
 
 	it("DELETE /api/dishes/:id is rejected without the authorized admin email", async () => {
